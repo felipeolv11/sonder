@@ -1,6 +1,7 @@
 import { cacheLife } from "next/cache";
 import * as dz from "./deezer";
 import { mapLimit } from "./http";
+import { translateHeading } from "./headings";
 import { baseTitle, capitalize, norm, sameTitle, yearOf } from "./text";
 import {
   articleUrl,
@@ -10,6 +11,7 @@ import {
   getSections,
   getSitelinks,
   getWikidataFacts,
+  translateTexts,
   publishedYear,
   type WikiArticle,
   type WikiLang,
@@ -72,12 +74,16 @@ type Source = { title: string; url: string };
 export type Story = {
   /** "song" when Wikipedia has an article for the track itself. */
   focus: "song" | "album" | "artist" | "none";
-  /** Wikipedia edition each block was read from; differs from the request when no local article exists. */
+  /**
+   * Wikipedia edition each block was read from; differs from the request when no local article exists.
+   * `translated` means the block was machine-translated (MinT) from that edition into the reader's language.
+   */
   songLang?: Lang;
+  songTranslated?: boolean;
   standfirst?: { paragraphs: string[]; source: Source };
   sections: StorySection[];
-  album?: { title: string; lang: Lang; paragraphs: string[]; sections: StorySection[]; source: Source };
-  artist?: { name: string; lang: Lang; paragraphs: string[]; source: Source };
+  album?: { title: string; lang: Lang; translated?: boolean; paragraphs: string[]; sections: StorySection[]; source: Source };
+  artist?: { name: string; lang: Lang; translated?: boolean; paragraphs: string[]; source: Source };
 };
 
 /** One data-backed reason a song was recommended; the UI phrases it. */
@@ -365,10 +371,12 @@ const stripQualifier = (title: string) => title.replace(/\s*\([^)]*\)$/, "");
 
 export async function getStory(id: number, lang: Lang = "en"): Promise<Story> {
   "use cache";
-  cacheLife("days");
 
   const song = await getSong(id, lang);
-  if (!song) return { focus: "none", sections: [] };
+  if (!song) {
+    cacheLife("days");
+    return { focus: "none", sections: [] };
+  }
 
   // Failures throw (and aren't cached) so a Wikipedia hiccup never becomes "no story" for days.
   const [songArticle, albumArticle] = await Promise.all([
@@ -419,7 +427,70 @@ export async function getStory(id: number, lang: Lang = "en"): Promise<Story> {
       if (story.focus === "none" && artist.paragraphs.length) story.focus = "artist";
     }
   }
+
+  // Blocks only available in English are machine-translated. If that fails, they stay in English
+  // (the UI says so) and the result is cached briefly so the translation is retried soon.
+  const translated = await translateStory(story, lang);
+  if (translated) cacheLife("days");
+  else cacheLife("minutes");
   return story;
+}
+
+type AddText = (text: string, set: (v: string) => void) => void;
+
+function sectionTexts(sections: StorySection[], lang: Lang, add: AddText, onSuccess: (fn: () => void) => void) {
+  // Known headings come from a hand-made glossary; only unfamiliar ones go to machine translation.
+  // Both are applied only if the whole translation succeeds, so a story is never half-translated.
+  const heading = (text: string, set: (v: string) => void) => {
+    const known = translateHeading(text, lang);
+    if (known) onSuccess(() => set(known));
+    else add(text, set);
+  };
+  for (const s of sections) {
+    heading(s.heading, (v) => (s.heading = v));
+    s.paragraphs.forEach((p, i) => add(p, (v) => (s.paragraphs[i] = v)));
+    for (const sub of s.subsections) {
+      heading(sub.heading, (v) => (sub.heading = v));
+      sub.paragraphs.forEach((p, i) => add(p, (v) => (sub.paragraphs[i] = v)));
+    }
+  }
+}
+
+/** Translates the story's English-only blocks in place. Returns false if translation failed. */
+async function translateStory(story: Story, lang: Lang): Promise<boolean> {
+  if (lang === "en") return true;
+  const jobs: { text: string; set: (v: string) => void }[] = [];
+  const add: AddText = (text, set) => jobs.push({ text, set });
+  const marks: (() => void)[] = [];
+  const onSuccess = (fn: () => void) => marks.push(fn);
+
+  if (story.focus === "song" && story.songLang && story.songLang !== lang) {
+    story.standfirst?.paragraphs.forEach((p, i) => add(p, (v) => (story.standfirst!.paragraphs[i] = v)));
+    sectionTexts(story.sections, lang, add, onSuccess);
+    marks.push(() => (story.songTranslated = true));
+  }
+  const album = story.album;
+  if (album && album.lang !== lang) {
+    album.paragraphs.forEach((p, i) => add(p, (v) => (album.paragraphs[i] = v)));
+    sectionTexts(album.sections, lang, add, onSuccess);
+    marks.push(() => (album.translated = true));
+  }
+  const artist = story.artist;
+  if (artist && artist.lang !== lang) {
+    artist.paragraphs.forEach((p, i) => add(p, (v) => (artist.paragraphs[i] = v)));
+    marks.push(() => (artist.translated = true));
+  }
+  if (jobs.length === 0 && marks.length === 0) return true;
+
+  try {
+    const out = jobs.length ? await translateTexts(jobs.map((j) => j.text), "en", lang) : [];
+    out.forEach((v, i) => jobs[i].set(v));
+    marks.forEach((m) => m());
+    return true;
+  } catch (err) {
+    console.error("[sonder] translation failed", err);
+    return false;
+  }
 }
 
 /* ---------- Recommendations ---------- */

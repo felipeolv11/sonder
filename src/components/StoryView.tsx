@@ -27,9 +27,13 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
 
   const kinds = new Set<StoryKind>([...story.sections, ...(story.album?.sections ?? [])].map((s) => s.kind));
   const legend = (["documented", "interpretation", "opinion"] as StoryKind[]).filter((k) => kinds.has(k));
-  // Blocks read from another Wikipedia edition carry their own lang attribute and a note.
-  const foreign = (lang?: Lang) => (lang && lang !== locale ? { lang: localeTags[lang] } : {});
-  const fallbackNote = (lang?: Lang) => (lang && lang !== locale ? <p className="story-note">{t.story.fallback}</p> : null);
+  // Blocks read from another Wikipedia edition get a note; untranslated ones keep their own lang attribute.
+  const foreign = (lang?: Lang, translated?: boolean) => (lang && lang !== locale && !translated ? { lang: localeTags[lang] } : {});
+  const sourceNote = (lang?: Lang, translated?: boolean) =>
+    lang && lang !== locale ? <p className="story-note">{translated ? t.story.translated : t.story.fallback}</p> : null;
+  const anyTranslated = !!(story.songTranslated || story.album?.translated || story.artist?.translated);
+  // Without a song article, the album (or artist) block opens the story, so it needs no divider above it.
+  const opening = story.focus !== "song" ? " is-first" : "";
 
   return (
     <div className="story-body">
@@ -46,8 +50,8 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
         </ul>
       )}
 
-      {fallbackNote(story.songLang)}
-      <div {...foreign(story.songLang)}>
+      {sourceNote(story.songLang, story.songTranslated)}
+      <div {...foreign(story.songLang, story.songTranslated)}>
         {story.standfirst && story.standfirst.paragraphs.length > 0 && (
           <div className="standfirst">
             {story.standfirst.paragraphs.map((p, i) => (
@@ -61,12 +65,12 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
       </div>
 
       {story.album && (story.album.paragraphs.length > 0 || story.album.sections.length > 0) && (
-        <section className="album-story" aria-labelledby="album-story-title">
+        <section className={`album-story${opening}`} aria-labelledby="album-story-title">
           <h3 id="album-story-title" className="album-story-title">
             {t.story.aboutAlbum} <cite>{story.album.title}</cite>
           </h3>
-          {fallbackNote(story.album.lang)}
-          <div {...foreign(story.album.lang)}>
+          {sourceNote(story.album.lang, story.album.translated)}
+          <div {...foreign(story.album.lang, story.album.translated)}>
             <SectionBody paragraphs={story.album.paragraphs} subsections={[]} initial={story.focus === "song" ? 2 : 4} />
             {story.album.sections.map((s) => (
               <Section key={`album-${s.heading}`} section={s} t={t} small />
@@ -77,12 +81,12 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
       )}
 
       {story.artist && story.artist.paragraphs.length > 0 && (
-        <section className="album-story" aria-labelledby="artist-story-title">
+        <section className={`album-story${story.album ? "" : opening}`} aria-labelledby="artist-story-title">
           <h3 id="artist-story-title" className="album-story-title">
             {t.story.aboutArtist(story.artist.name)}
           </h3>
-          {fallbackNote(story.artist.lang)}
-          <div {...foreign(story.artist.lang)}>
+          {sourceNote(story.artist.lang, story.artist.translated)}
+          <div {...foreign(story.artist.lang, story.artist.translated)}>
             <SectionBody paragraphs={story.artist.paragraphs} subsections={[]} initial={3} />
           </div>
           <SourceLine t={t} title={story.artist.source.title} url={story.artist.source.url} />
@@ -95,6 +99,7 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
           CC BY-SA 4.0
         </a>
         {t.story.license[1]}
+        {anyTranslated && t.story.licenseTranslated}
       </footer>
     </div>
   );

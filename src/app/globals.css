@@ -1152,6 +1152,12 @@ p {
   padding-top: 40px;
   border-top: 1px solid var(--separator);
 }
+/* When there's no song article, the album or artist story opens the section: no divider above it. */
+.album-story.is-first {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
 .album-story-title {
   font-family: var(--font-serif);
   font-weight: 400;

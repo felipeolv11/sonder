@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:3000
 | O quê | Fonte | Observações |
 | --- | --- | --- |
 | Busca, capa, álbum, duração, andamento, gravadora | [API do Deezer](https://developers.deezer.com/api) | Não precisa de chave. As requisições são espaçadas para respeitar o limite de 50 a cada 5 segundos. |
-| História da música e do álbum | Wikipedia (Action API, extratos em texto puro) | Exibida como citação, com links para as seções e atribuição CC BY-SA. Nada é gerado nem reescrito. |
+| História da música e do álbum | Wikipedia (Action API, extratos em texto puro) | Exibida como citação, com links para as seções e atribuição CC BY-SA. Nada é gerado nem reescrito; a única transformação é a tradução automática, sempre sinalizada (veja Idiomas). |
 | Créditos (compositores, produtores, estúdio, data de lançamento, gêneros) | Wikidata | Lidos do item do Wikidata ligado ao artigo da música na Wikipedia. |
 | Recomendações | Artistas relacionados do Deezer, mais gêneros, datas e BPM dos álbuns | Veja abaixo. |
 
@@ -47,7 +47,7 @@ A interface está em inglês, português (Brasil) e espanhol, em `/en`, `/pt` e 
 
 - `src/proxy.ts` redireciona endereços sem idioma (`/`, `/song/123`). Usa o idioma escolhido antes pelo visitante (o cookie `NEXT_LOCALE`, salvo pelo menu de idioma); senão, o `Accept-Language` do navegador; senão, inglês.
 - Os textos da interface ficam em `src/i18n/dictionaries.ts`. Para adicionar um idioma, inclua-o em `locales` no `src/i18n/config.ts` e crie o dicionário dele.
-- A história vem da Wikipedia no idioma do leitor quando essa edição tem um artigo substancial, encontrado pelos sitelinks do Wikidata. Caso contrário, aparece o artigo em inglês com um aviso. Créditos e gêneros usam os nomes do Wikidata e do Deezer no mesmo idioma. A camada de dados devolve fatos e motivos de recomendação como dados estruturados, e a interface monta as frases.
+- A história vem da Wikipedia no idioma do leitor quando essa edição tem um artigo substancial, encontrado pelos sitelinks do Wikidata. Caso contrário, o artigo em inglês é traduzido automaticamente pelo [MinT](https://www.mediawiki.org/wiki/MinT), o serviço de tradução aberto da Wikimedia, e o trecho recebe o aviso "tradução automática". Títulos de seção comuns ("Background", "Recording"…) usam um glossário próprio (`src/lib/headings.ts`), porque a tradução automática erra rótulos curtos sem contexto. Se a tradução falhar, o texto aparece em inglês com um aviso e o resultado fica pouco tempo em cache. Créditos e gêneros usam os nomes do Wikidata e do Deezer no mesmo idioma. A camada de dados devolve fatos e motivos de recomendação como dados estruturados, e a interface monta as frases.
 
 ## Estrutura
 

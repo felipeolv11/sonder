@@ -17,12 +17,19 @@ const wikimedia = createLimiter(2, 150);
 // After a 429, stop calling until Retry-After has passed instead of piling on more requests.
 let blockedUntil = 0;
 
-async function wikimediaFetch(url: string, source: string): Promise<unknown> {
+async function wikimediaFetch(url: string, source: string, body?: unknown, timeoutMs = 9000): Promise<unknown> {
   if (Date.now() < blockedUntil) throw new UpstreamError(`${source} is rate limiting requests`, source);
   return wikimedia(async () => {
     const res = await fetch(url, {
-      headers: { "User-Agent": WIKIMEDIA_UA, Accept: "application/json", "Api-User-Agent": WIKIMEDIA_UA },
-      signal: AbortSignal.timeout(9000),
+      method: body === undefined ? "GET" : "POST",
+      headers: {
+        "User-Agent": WIKIMEDIA_UA,
+        Accept: "application/json",
+        "Api-User-Agent": WIKIMEDIA_UA,
+        ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+      },
+      body: body === undefined ? undefined : JSON.stringify(body),
+      signal: AbortSignal.timeout(timeoutMs),
     });
     if (res.status === 429) {
       const after = Number(res.headers.get("retry-after"));
@@ -304,4 +311,68 @@ export async function getWikidataFacts(qid: string, lang: WikiLang = "en"): Prom
 
 export function publishedYear(f?: WikidataFacts | null) {
   return yearOf(f?.published?.iso);
+}
+
+/* ---------- Machine translation (MinT) ---------- */
+
+/*
+ * MinT is Wikimedia's open machine-translation service, the one behind Wikipedia's Content
+ * Translation tool. It takes HTML and keeps element ids, so many paragraphs go in one request.
+ */
+const MINT = (from: WikiLang, to: WikiLang) => `https://cxserver.wikimedia.org/v2/translate/${from}/${to}/MinT`;
+const BATCH_CHARS = 4500;
+
+const escapeHtml = (s: string) => s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+const decodeHtml = (s: string) =>
+  s
+    .replace(/<[^>]+>/g, "")
+    .replace(/&#x([0-9a-f]+);/gi, (_, h) => String.fromCodePoint(parseInt(h, 16)))
+    .replace(/&#(\d+);/g, (_, d) => String.fromCodePoint(Number(d)))
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .trim();
+
+async function translateBatch(texts: string[], offset: number, from: WikiLang, to: WikiLang): Promise<string[]> {
+  // MinT only translates the first top-level element, so everything goes inside one root.
+  const html = `<div>${texts.map((t, i) => `<p id="t${offset + i}">${escapeHtml(t)}</p>`).join("")}</div>`;
+  const res = (await wikimediaFetch(MINT(from, to), "MinT", { html }, 30000)) as { contents?: string };
+  const found = new Map<number, string>();
+  for (const m of (res.contents ?? "").matchAll(/<p[^>]*\bid="t(\d+)"[^>]*>([\s\S]*?)<\/p>/g)) {
+    found.set(Number(m[1]), decodeHtml(m[2]));
+  }
+  return texts.map((_, i) => {
+    const out = found.get(offset + i);
+    if (!out) throw new UpstreamError("MinT returned an incomplete translation", "MinT");
+    return out;
+  });
+}
+
+/**
+ * Translates plain-text strings, keeping their order. Throws if any piece comes back missing,
+ * so callers can fall back to the original language rather than show a half-translated story.
+ */
+export async function translateTexts(texts: string[], from: WikiLang, to: WikiLang): Promise<string[]> {
+  "use cache";
+  cacheLife("days");
+  if (from === to || texts.length === 0) return texts;
+
+  const batches: { start: number; items: string[] }[] = [];
+  let size = 0;
+  texts.forEach((t, i) => {
+    const last = batches[batches.length - 1];
+    if (!last || size + t.length > BATCH_CHARS) {
+      batches.push({ start: i, items: [t] });
+      size = t.length;
+    } else {
+      last.items.push(t);
+      size += t.length;
+    }
+  });
+
+  const results = await Promise.all(batches.map((b) => translateBatch(b.items, b.start, from, to)));
+  return results.flat();
 }

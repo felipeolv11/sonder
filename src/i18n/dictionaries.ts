@@ -83,6 +83,8 @@ const en = {
     noSongAlbum: "Wikipedia doesn’t have an article about this song, so this is the story of the album it belongs to.",
     noSongArtist: "Wikipedia doesn’t have an article about this song, so this is the story of the artist.",
     fallback: "Wikipedia doesn’t have a full article on this in English, so this part is shown in its original language.",
+    translated: "Wikipedia doesn’t have a full article on this in English. This part is a machine translation.",
+    licenseTranslated: " Passages marked as machine translations were translated with MinT, Wikimedia’s open translation service, and may contain errors.",
     legend: "How to read this story",
     kinds: {
       documented: "Documented history",
@@ -221,6 +223,8 @@ const pt: Dictionary = {
     noSongAlbum: "A Wikipedia não tem um artigo sobre esta música, então esta é a história do álbum de que ela faz parte.",
     noSongArtist: "A Wikipedia não tem um artigo sobre esta música, então esta é a história do artista.",
     fallback: "A Wikipedia em português não tem um artigo completo sobre isto, então este trecho aparece em inglês.",
+    translated: "A Wikipedia em português não tem um artigo completo sobre isto. Este trecho é uma tradução automática do artigo em inglês.",
+    licenseTranslated: " Os trechos marcados como tradução automática foram traduzidos pelo MinT, o serviço de tradução aberto da Wikimedia, e podem conter erros.",
     legend: "Como ler esta história",
     kinds: {
       documented: "História documentada",
@@ -357,6 +361,8 @@ const es: Dictionary = {
     noSongAlbum: "Wikipedia no tiene un artículo sobre esta canción, así que esta es la historia del álbum al que pertenece.",
     noSongArtist: "Wikipedia no tiene un artículo sobre esta canción, así que esta es la historia del artista.",
     fallback: "Wikipedia en español no tiene un artículo completo sobre esto, así que este fragmento aparece en inglés.",
+    translated: "Wikipedia en español no tiene un artículo completo sobre esto. Este fragmento es una traducción automática del artículo en inglés.",
+    licenseTranslated: " Los fragmentos marcados como traducción automática se tradujeron con MinT, el servicio de traducción abierto de Wikimedia, y pueden contener errores.",
     legend: "Cómo leer esta historia",
     kinds: {
       documented: "Historia documentada",
