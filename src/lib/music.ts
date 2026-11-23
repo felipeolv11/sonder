@@ -1,18 +1,23 @@
 import { cacheLife } from "next/cache";
 import * as dz from "./deezer";
 import { mapLimit } from "./http";
-import { baseTitle, capitalize, listJoin, norm, numberWord, sameTitle, yearOf } from "./text";
+import { baseTitle, capitalize, norm, sameTitle, yearOf } from "./text";
 import {
   articleUrl,
   findAlbumArticle,
   findArtistArticle,
   findSongArticle,
   getSections,
+  getSitelinks,
   getWikidataFacts,
   publishedYear,
   type WikiArticle,
+  type WikiLang,
   type WikidataFacts,
 } from "./wiki";
+
+/** Content language: which Wikipedia edition, Wikidata labels and Deezer genre names to use. */
+export type Lang = WikiLang;
 
 /* ---------- Types shared with the UI ---------- */
 
@@ -25,7 +30,17 @@ export type SongCard = {
   coverSmall: string;
 };
 
-export type Fact = { label: string; value: string; source: "Wikidata" | "Deezer" };
+export type FactKey = "writtenBy" | "producedBy" | "recordedAt" | "released" | "label" | "track" | "length" | "tempo";
+
+/** A credit or release detail. The UI turns it into text in the reader's language. */
+export type Fact = {
+  key: FactKey;
+  source: "Wikidata" | "Deezer";
+  /** Names or a plain value (joined as a list by the UI). */
+  values?: string[];
+  date?: { iso: string; precision: number };
+  track?: { n: number; total: number; album: string };
+};
 
 export type Song = {
   id: number;
@@ -52,18 +67,31 @@ export type StorySection = {
   source: { title: string; url: string };
 };
 
+type Source = { title: string; url: string };
+
 export type Story = {
   /** "song" when Wikipedia has an article for the track itself. */
   focus: "song" | "album" | "artist" | "none";
-  standfirst?: { paragraphs: string[]; source: { title: string; url: string } };
+  /** Wikipedia edition each block was read from; differs from the request when no local article exists. */
+  songLang?: Lang;
+  standfirst?: { paragraphs: string[]; source: Source };
   sections: StorySection[];
-  album?: { title: string; paragraphs: string[]; sections: StorySection[]; source: { title: string; url: string } };
-  artist?: { name: string; paragraphs: string[]; source: { title: string; url: string } };
+  album?: { title: string; lang: Lang; paragraphs: string[]; sections: StorySection[]; source: Source };
+  artist?: { name: string; lang: Lang; paragraphs: string[]; source: Source };
 };
+
+/** One data-backed reason a song was recommended; the UI phrases it. */
+export type ReasonPart =
+  | { t: "related"; top: boolean; seed: string }
+  | { t: "sharesTag"; tag: string; title: string }
+  | { t: "leans"; genre: string }
+  | { t: "tempo"; bpm: number; seed: number }
+  | { t: "era"; album: string; year: number; diff: number; title: string }
+  | { t: "label"; label: string };
 
 export type Recommendation = SongCard & {
   year?: number;
-  reason: string;
+  reasons: ReasonPart[];
   signals: string[];
 };
 
@@ -95,8 +123,9 @@ export async function searchSongs(query: string, limit = 24): Promise<SongCard[]
   // Artists whose name appears in the query are almost certainly what the person meant.
   const namedArtists = new Set(tracks.map((t) => norm(t.artist.name)).filter((a) => a.length > 1 && qn.includes(` ${a} `)));
 
+  // No playback here, so a track's regional "readable" flag doesn't matter: the server may run in a
+  // country where Deezer marks most of the catalogue unplayable.
   const scored = tracks
-    .filter((t) => t.readable !== false)
     .map((t, i) => {
       const artist = norm(t.artist.name);
       let score = 100 - i; // Deezer relevance order
@@ -137,14 +166,14 @@ async function safe<T>(p: Promise<T>): Promise<T | null> {
 }
 
 /** Finds the studio album a track first appeared on, when Deezer handed us a single or compilation. */
-async function canonicalAlbum(track: dz.DzTrack, album: dz.DzAlbum, candidates: string[]): Promise<dz.DzAlbum> {
+async function canonicalAlbum(track: dz.DzTrack, album: dz.DzAlbum, candidates: string[], lang: Lang): Promise<dz.DzAlbum> {
   if (album.record_type === "album") return album;
   for (const name of candidates) {
     if (sameTitle(name, track.title)) continue;
     const found = await safe(dz.searchAlbums(`${track.artist.name} ${name}`, 15));
     const hit = (found ?? []).find((a) => a.artist?.id === track.artist.id && norm(a.title) === norm(name) && a.record_type === "album");
     if (!hit) continue;
-    const full = await safe(dz.getAlbum(hit.id));
+    const full = await safe(dz.getAlbum(hit.id, lang));
     if (full?.tracks?.data.some((t) => sameTitle(t.title, track.title))) return full;
   }
   return album;
@@ -157,15 +186,7 @@ function albumFromIntro(intro: string): string[] {
   return out;
 }
 
-function precisionDate(iso: string, precision: number) {
-  const d = new Date(iso.slice(0, 10) + "T00:00:00Z");
-  if (Number.isNaN(d.getTime())) return iso.slice(0, 4);
-  if (precision >= 11) return d.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" });
-  if (precision === 10) return d.toLocaleDateString("en-GB", { month: "long", year: "numeric", timeZone: "UTC" });
-  return iso.slice(0, 4);
-}
-
-export async function getSong(id: number): Promise<Song | null> {
+export async function getSong(id: number, lang: Lang = "en"): Promise<Song | null> {
   "use cache";
 
   let track: dz.DzTrack;
@@ -178,7 +199,7 @@ export async function getSong(id: number): Promise<Song | null> {
     }
     throw e;
   }
-  const firstAlbum = await dz.getAlbum(track.album.id);
+  const firstAlbum = await dz.getAlbum(track.album.id, lang);
 
   // Wikipedia/Wikidata are enrichment: if they fail, still show the song, but only cache it briefly.
   let degraded = false;
@@ -190,39 +211,39 @@ export async function getSong(id: number): Promise<Song | null> {
     });
 
   const article = await enrich(findSongArticle(track.title, track.artist.name));
-  const songFacts = article?.wikidataId ? await enrich(getWikidataFacts(article.wikidataId)) : null;
+  const songFacts = article?.wikidataId ? await enrich(getWikidataFacts(article.wikidataId, lang)) : null;
 
   const albumCandidates = [
     ...(songFacts?.partOf ?? []),
     ...albumFromIntro(article?.intro ?? ""),
   ].filter((n, i, arr) => arr.indexOf(n) === i);
 
-  const album = await canonicalAlbum(track, firstAlbum, albumCandidates);
+  const album = await canonicalAlbum(track, firstAlbum, albumCandidates, lang);
   const albumName = album.record_type === "album" ? album.title : albumCandidates.find((n) => !sameTitle(n, track.title));
 
   const dzGenres = (album.genres?.data ?? firstAlbum.genres?.data ?? []).map((g) => g.name);
   const wdGenres = (songFacts?.genres ?? []).map(capitalize);
 
-  const credits = (xs: string[] | undefined) => (xs && xs.length ? listJoin(xs.slice(0, 4)) : undefined);
   const writers = [...new Set([...(songFacts?.lyricists ?? []), ...(songFacts?.composers ?? []), ...(songFacts?.writers ?? [])])];
 
   const facts: Fact[] = [];
-  const push = (label: string, value: string | undefined, source: Fact["source"]) => {
-    if (value) facts.push({ label, value, source });
+  const names = (key: FactKey, xs: string[] | undefined) => {
+    if (xs && xs.length) facts.push({ key, source: "Wikidata", values: xs.slice(0, 4) });
   };
-  push("Written by", credits(writers), "Wikidata");
-  push("Produced by", credits(songFacts?.producers), "Wikidata");
-  push("Recorded at", credits(songFacts?.recordedAt), "Wikidata");
-  push("Released", songFacts?.published ? precisionDate(songFacts.published.iso, songFacts.published.precision) : undefined, "Wikidata");
-  push("Label", songFacts?.labels[0] ?? album.label, songFacts?.labels[0] ? "Wikidata" : "Deezer");
+  names("writtenBy", writers);
+  names("producedBy", songFacts?.producers);
+  names("recordedAt", songFacts?.recordedAt);
+  if (songFacts?.published) facts.push({ key: "released", source: "Wikidata", date: songFacts.published });
+  const label = songFacts?.labels[0] ?? album.label;
+  if (label) facts.push({ key: "label", source: songFacts?.labels[0] ? "Wikidata" : "Deezer", values: [label] });
 
   const position = album.tracks?.data.findIndex((t) => sameTitle(t.title, track.title)) ?? -1;
   if (album.record_type === "album" && position >= 0 && album.nb_tracks) {
-    push("Track", `${position + 1} of ${album.nb_tracks} on ${album.title}`, "Deezer");
+    facts.push({ key: "track", source: "Deezer", track: { n: position + 1, total: album.nb_tracks, album: album.title } });
   }
   const m = Math.floor(track.duration / 60);
-  push("Length", `${m}:${String(track.duration % 60).padStart(2, "0")}`, "Deezer");
-  if (track.bpm && track.bpm > 0) push("Tempo", `${Math.round(track.bpm)} BPM`, "Deezer");
+  facts.push({ key: "length", source: "Deezer", values: [`${m}:${String(track.duration % 60).padStart(2, "0")}`] });
+  if (track.bpm && track.bpm > 0) facts.push({ key: "tempo", source: "Deezer", values: [`${Math.round(track.bpm)} BPM`] });
 
   const year = publishedYear(songFacts) ?? yearOf(album.release_date) ?? yearOf(track.release_date);
   if (degraded) cacheLife("minutes");
@@ -257,10 +278,18 @@ export async function getSong(id: number): Promise<Song | null> {
 
 /* ---------- Story ---------- */
 
-const SKIP =
-  /references|external links|^notes|further reading|see also|track ?listing|personnel|credits|charts?$|chart performance|certifications|release history|sales|bibliography|sources|citations|footnotes|formats|year-end|weekly|decade-end|all-time|accolades|awards|cover versions|^covers|in popular culture|other versions|live performances|in media|appearances|tour$|setlist|videography|discography|samples|\bversions?$|remix(es)?$/i;
-const INTERPRETATION = /lyric|meaning|theme|composition|music and|interpretation|style|analysis|content|songwriting|sound/i;
-const OPINION = /reception|critical|legacy|review|influence|impact|response|retrospective/i;
+// Section headings to leave out, in English, Portuguese and Spanish Wikipedia.
+const SKIP = new RegExp(
+  [
+    "references|external links|^notes|further reading|see also|track ?listing|personnel|credits|charts?$|chart performance|certifications|release history|sales|bibliography|sources|citations|footnotes|formats|year-end|weekly|decade-end|all-time|accolades|awards|cover versions|^covers|in popular culture|other versions|live performances|in media|appearances|tour$|setlist|videography|discography|samples|\\bversions?$|remix(es)?$",
+    "refer[eê]ncias|liga[çc][õo]es externas|enlaces externos|bibliograf[ií]a|ver tamb[ée]m|v[ée]ase tambi[ée]n|lista de (faixas|canciones|temas)|faixas|cr[ée]ditos|^personal$|^equipe|paradas|desempenho|posi[çc][õo]es|posicionamiento|listas|certifica[çc]|hist[óo]rico de lan[çc]amento|historial de lanzamiento|vendas|ventas|pr[êé]mios|premios|vers[õo]es|versiones|^vers[ãa]o (de|em|por)|^versi[óo]n (de|en|por)|regrava[çc]|cultura popular|ao vivo|en vivo|turn[êe]|^gira|^fontes|^fuentes|^formatos",
+  ].join("|"),
+  "i",
+);
+const INTERPRETATION =
+  /lyric|meaning|theme|composition|music and|interpretation|style|analysis|content|songwriting|sound|letra|significado|tema|composi[çc][ãa]o|composici[óo]n|interpreta[çc]|estilo|an[áa]lis|conte[úu]do|contenido|sonoridad/i;
+const OPINION =
+  /reception|critical|legacy|review|influence|impact|response|retrospective|recep[çc][ãa]o|recepci[óo]n|cr[íi]tica|legado|influ[êe]ncia|influencia|impacto|avalia[çc]|rese[ñn]as|resenhas/i;
 
 function clean(p: string) {
   return p
@@ -277,7 +306,8 @@ function usable(paragraphs: string[]) {
 }
 
 // Headings that lead with history ("Background and composition") are mostly documented events.
-const DOCUMENTED_FIRST = /^(background|history|origins?|writing|recording|production|development|conception|release|inspiration)/i;
+const DOCUMENTED_FIRST =
+  /^(background|history|origins?|writing|recording|production|development|conception|release|inspiration|antecedentes|hist[óo]ria|origem|origen|contexto|escrita|grava[çc][ãa]o|grabaci[óo]n|produ[çc][ãa]o|producci[óo]n|desenvolvimento|desarrollo|concep[çc]|lan[çc]amento|lanzamiento|inspira[çc])/i;
 
 function classify(heading: string): StoryKind {
   if (DOCUMENTED_FIRST.test(heading)) return "documented";
@@ -286,8 +316,8 @@ function classify(heading: string): StoryKind {
   return "documented";
 }
 
-async function articleStory(article: WikiArticle, maxSections: number) {
-  const { lead, sections } = await getSections(article.title);
+async function articleStory(title: string, lang: Lang, maxSections: number) {
+  const { lead, sections } = await getSections(title, lang);
   const out: StorySection[] = [];
   let current: StorySection | null = null;
 
@@ -300,7 +330,7 @@ async function articleStory(article: WikiArticle, maxSections: number) {
         kind: classify(s.heading),
         paragraphs: usable(s.paragraphs),
         subsections: [],
-        source: { title: article.title, url: articleUrl(article.title, s.anchor) },
+        source: { title, url: articleUrl(title, s.anchor, lang) },
       };
       out.push(current);
     } else if (current && !SKIP.test(s.heading)) {
@@ -314,11 +344,30 @@ async function articleStory(article: WikiArticle, maxSections: number) {
   };
 }
 
-export async function getStory(id: number): Promise<Story> {
+function paragraphCount(s: { lead: string[]; sections: StorySection[] }) {
+  return s.lead.length + s.sections.reduce((n, x) => n + x.paragraphs.length + x.subsections.reduce((m, y) => m + y.paragraphs.length, 0), 0);
+}
+
+/** The article in the reader's language when Wikipedia has a substantial one, otherwise English. */
+async function localizedStory(article: WikiArticle, lang: Lang, maxSections: number) {
+  if (lang !== "en" && article.wikidataId) {
+    const local = (await getSitelinks(article.wikidataId))[lang];
+    if (local) {
+      const s = await articleStory(local, lang, maxSections);
+      if (paragraphCount(s) >= 3) return { ...s, title: local, lang, url: articleUrl(local, undefined, lang) };
+    }
+  }
+  const s = await articleStory(article.title, "en", maxSections);
+  return { ...s, title: article.title, lang: "en" as Lang, url: article.url };
+}
+
+const stripQualifier = (title: string) => title.replace(/\s*\([^)]*\)$/, "");
+
+export async function getStory(id: number, lang: Lang = "en"): Promise<Story> {
   "use cache";
   cacheLife("days");
 
-  const song = await getSong(id);
+  const song = await getSong(id, lang);
   if (!song) return { focus: "none", sections: [] };
 
   // Failures throw (and aren't cached) so a Wikipedia hiccup never becomes "no story" for days.
@@ -331,25 +380,21 @@ export async function getStory(id: number): Promise<Story> {
   const story: Story = { focus: "none", sections: [] };
 
   if (songArticle) {
-    const s = await articleStory(songArticle, 8);
-    if (s && (s.lead.length || s.sections.length)) {
+    const s = await localizedStory(songArticle, lang, 8);
+    if (s.lead.length || s.sections.length) {
       story.focus = "song";
-      story.standfirst = { paragraphs: s.lead, source: { title: songArticle.title, url: songArticle.url } };
+      story.songLang = s.lang;
+      story.standfirst = { paragraphs: s.lead, source: { title: s.title, url: s.url } };
       story.sections = s.sections;
     }
   }
 
   if (albumArticle && !sameArticle) {
-    const s = await articleStory(albumArticle, story.focus === "song" ? 2 : 6);
-    if (s && (s.lead.length || s.sections.length)) {
+    const s = await localizedStory(albumArticle, lang, story.focus === "song" ? 2 : 6);
+    if (s.lead.length || s.sections.length) {
       // When the song has its own article, keep only the album's origin story.
       const sections = story.focus === "song" ? s.sections.filter((x) => x.kind === "documented").slice(0, 2) : s.sections;
-      story.album = {
-        title: albumArticle.title.replace(/\s*\([^)]*\)$/, ""),
-        paragraphs: s.lead,
-        sections,
-        source: { title: albumArticle.title, url: albumArticle.url },
-      };
+      story.album = { title: stripQualifier(s.title), lang: s.lang, paragraphs: s.lead, sections, source: { title: s.title, url: s.url } };
       if (story.focus === "none") story.focus = "album";
     }
   }
@@ -357,12 +402,21 @@ export async function getStory(id: number): Promise<Story> {
   if (story.focus === "none" || !story.album) {
     const artistArticle = await findArtistArticle(song.artist.name);
     if (artistArticle?.intro) {
-      story.artist = {
+      let artist: NonNullable<Story["artist"]> = {
         name: song.artist.name,
+        lang: "en",
         paragraphs: usable(artistArticle.intro.split("\n")).slice(0, 3),
         source: { title: artistArticle.title, url: artistArticle.url },
       };
-      if (story.focus === "none" && story.artist.paragraphs.length) story.focus = "artist";
+      if (lang !== "en" && artistArticle.wikidataId) {
+        const local = (await getSitelinks(artistArticle.wikidataId))[lang];
+        const lead = local ? usable((await getSections(local, lang)).lead).slice(0, 3) : [];
+        if (local && lead.length >= 2) {
+          artist = { name: song.artist.name, lang, paragraphs: lead, source: { title: local, url: articleUrl(local, undefined, lang) } };
+        }
+      }
+      story.artist = artist;
+      if (story.focus === "none" && artist.paragraphs.length) story.focus = "artist";
     }
   }
   return story;
@@ -376,19 +430,8 @@ type Candidate = { artist: dz.DzArtist; relatedRank: number; track: dz.DzTrack }
 
 function pickTrack(artist: dz.DzArtist, tracks: dz.DzTrack[], seedTitle: string): dz.DzTrack | undefined {
   return tracks.find(
-    (t) => t.artist.id === artist.id && t.readable !== false && !NOT_ORIGINAL.test(t.title) && !sameTitle(t.title, seedTitle),
+    (t) => t.artist.id === artist.id && !NOT_ORIGINAL.test(t.title) && !sameTitle(t.title, seedTitle),
   );
-}
-
-function eraPhrase(album: string, year: number | undefined, seedYear: number | undefined, seedTitle: string) {
-  if (!year || !seedYear) return undefined;
-  const d = year - seedYear;
-  if (d === 0) return `From ${album} (${year}), the same year as “${seedTitle}”.`;
-  if (Math.abs(d) <= 3) {
-    const n = Math.abs(d);
-    return `From ${album} (${year}), ${numberWord(n)} year${n > 1 ? "s" : ""} ${d > 0 ? "after" : "before"} “${seedTitle}”.`;
-  }
-  return undefined;
 }
 
 // Compilations and reissues carry the wrong date for a song, so look past them.
@@ -403,8 +446,8 @@ function isOriginalRelease(a: dz.DzAlbum | null, artistId: number): a is dz.DzAl
  * Popular tracks often surface from a compilation or reissue. When that happens, look for the
  * same studio recording on an original release; otherwise keep it and describe the album as is.
  */
-async function originalRelease(c: Candidate) {
-  const album = await safe(dz.getAlbum(c.track.album.id));
+async function originalRelease(c: Candidate, lang: Lang) {
+  const album = await safe(dz.getAlbum(c.track.album.id, lang));
   if (isOriginalRelease(album, c.artist.id)) return { track: c.track, album };
 
   const found = await safe(dz.searchTracks(`${c.artist.name} ${baseTitle(c.track.title)}`, 25));
@@ -417,16 +460,16 @@ async function originalRelease(c: Candidate) {
       !REISSUE.test(t.album.title) &&
       t.album.id !== c.track.album.id,
   );
-  const alt = option ? await safe(dz.getAlbum(option.album.id)) : null;
+  const alt = option ? await safe(dz.getAlbum(option.album.id, lang)) : null;
   if (option && isOriginalRelease(alt, c.artist.id)) return { track: option, album: alt };
   return { track: c.track, album };
 }
 
-export async function getRecommendations(id: number): Promise<Recommendation[]> {
+export async function getRecommendations(id: number, lang: Lang = "en"): Promise<Recommendation[]> {
   "use cache";
   cacheLife("days");
 
-  const song = await getSong(id);
+  const song = await getSong(id, lang);
   if (!song) return [];
 
   const related = (await dz.getRelatedArtists(song.artist.id, 20)).filter((a) => a.id !== song.artist.id).slice(0, 14);
@@ -440,7 +483,7 @@ export async function getRecommendations(id: number): Promise<Recommendation[]> 
   });
 
   const detailed = await mapLimit(candidates.slice(0, 11), 3, async (c) => {
-    const original = await originalRelease(c);
+    const original = await originalRelease(c, lang);
     const detail = await safe(dz.getTrack(original.track.id));
     return { ...c, ...original, detail };
   });
@@ -461,22 +504,16 @@ export async function getRecommendations(id: number): Promise<Recommendation[]> 
     if (year && song.seed.year) score += 0.2 * (1 - Math.min(Math.abs(year - song.seed.year), 20) / 20);
     if (bpm && song.seed.bpm) score += 0.1 * (1 - Math.min(Math.abs(bpm - song.seed.bpm), 30) / 30);
 
-    // Every sentence below restates a data point; nothing is invented.
-    const parts: string[] = [];
-    parts.push(
-      c.relatedRank < 3
-        ? `Among the three artists Deezer relates most closely to ${seedName}.`
-        : `One of the artists Deezer relates to ${seedName}.`,
-    );
-    if (sharedGenres.length) parts.push(`Shares the ${sharedGenres[0].toLowerCase()} tag with “${song.title}”.`);
-    else if (genres.length) parts.push(`Leans toward ${genres[0].toLowerCase()}.`);
+    // Every reason restates a data point; nothing is invented.
+    const parts: ReasonPart[] = [{ t: "related", top: c.relatedRank < 3, seed: seedName }];
+    if (sharedGenres.length) parts.push({ t: "sharesTag", tag: sharedGenres[0], title: song.title });
+    else if (genres.length) parts.push({ t: "leans", genre: genres[0] });
     if (bpm && song.seed.bpm && Math.abs(bpm - song.seed.bpm) <= 6) {
-      parts.push(`A similar tempo: ${Math.round(bpm)} BPM against ${Math.round(song.seed.bpm)}.`);
-    } else {
-      const era = eraPhrase(albumTitle, year, song.seed.year, song.title);
-      if (era) parts.push(era);
+      parts.push({ t: "tempo", bpm: Math.round(bpm), seed: Math.round(song.seed.bpm) });
+    } else if (year && song.seed.year && Math.abs(year - song.seed.year) <= 3) {
+      parts.push({ t: "era", album: albumTitle, year, diff: year - song.seed.year, title: song.title });
     }
-    if (label && song.seed.label && norm(label) === norm(song.seed.label)) parts.push(`Also released on ${label}.`);
+    if (label && song.seed.label && norm(label) === norm(song.seed.label)) parts.push({ t: "label", label });
 
     const signals = [
       ...(genres.length ? [genres[0]] : []),
@@ -493,7 +530,7 @@ export async function getRecommendations(id: number): Promise<Recommendation[]> 
         album: albumTitle,
         cover: c.album?.cover_xl || c.track.album.cover_xl || c.track.album.cover_big,
         year,
-        reason: parts.slice(0, 3).join(" "),
+        reasons: parts.slice(0, 3),
         signals,
       } satisfies Recommendation,
     };

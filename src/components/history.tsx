@@ -2,6 +2,8 @@
 
 import Link from "next/link";
 import { useEffect, useSyncExternalStore } from "react";
+import { useDictionary, useLocale } from "@/i18n/client";
+import { href } from "@/i18n/config";
 
 export type Visit = { id: number; title: string; artist: string; album: string; cover: string; at: number };
 
@@ -69,18 +71,20 @@ export function RecordVisit(visit: Omit<Visit, "at">) {
 
 export function RecentlyExplored() {
   const items = useHistory();
+  const locale = useLocale();
+  const t = useDictionary();
   if (!items || items.length === 0) return null;
 
   return (
     <section className="recent" aria-labelledby="recent-title">
       <div className="recent-head">
-        <h2 id="recent-title">Pick up where you left off</h2>
-        <Link href="/history">See all</Link>
+        <h2 id="recent-title">{t.home.recentTitle}</h2>
+        <Link href={href(locale, "/history")}>{t.home.seeAll}</Link>
       </div>
       <ul className="recent-row">
         {items.slice(0, 6).map((v) => (
           <li key={v.id}>
-            <Link href={`/song/${v.id}`} className="recent-item">
+            <Link href={href(locale, `/song/${v.id}`)} className="recent-item">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={v.cover} alt="" width={56} height={56} loading="lazy" />
               <span>

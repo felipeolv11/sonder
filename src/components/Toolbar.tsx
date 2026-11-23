@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { Suspense } from "react";
+import { href, type Locale } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { LanguageMenu } from "./LanguageMenu";
 import { NavLinks, ToolbarSearch } from "./ToolbarParts";
 
-export function Toolbar() {
+export function Toolbar({ locale }: { locale: Locale }) {
+  const t = getDictionary(locale);
   return (
     <header className="toolbar">
       <div className="toolbar-inner">
-        <Link href="/" className="brand" aria-label="Sonder home">
+        <Link href={href(locale)} className="brand" aria-label={t.nav.home}>
           <BrandMark />
           <span>Sonder</span>
         </Link>
@@ -15,16 +19,21 @@ export function Toolbar() {
           <ToolbarSearch />
         </Suspense>
 
-        <Suspense
-          fallback={
-            <nav className="toolbar-nav" aria-label="Main">
-              <Link href="/">Discover</Link>
-              <Link href="/history">History</Link>
-            </nav>
-          }
-        >
-          <NavLinks />
-        </Suspense>
+        <div className="toolbar-end">
+          <Suspense
+            fallback={
+              <nav className="toolbar-nav" aria-label={t.nav.main}>
+                <Link href={href(locale)}>{t.nav.discover}</Link>
+                <Link href={href(locale, "/history")}>{t.nav.history}</Link>
+              </nav>
+            }
+          >
+            <NavLinks />
+          </Suspense>
+          <Suspense fallback={<span className="lang-button" aria-hidden="true">{locale.toUpperCase()}</span>}>
+            <LanguageMenu />
+          </Suspense>
+        </div>
       </div>
     </header>
   );

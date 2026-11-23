@@ -3,6 +3,9 @@ import { Suspense } from "react";
 import { Ambient } from "@/components/Ambient";
 import { RecentlyExplored } from "@/components/history";
 import { SearchField } from "@/components/SearchField";
+import { href } from "@/i18n/config";
+import { getDictionary } from "@/i18n/dictionaries";
+import { getLocale } from "@/i18n/server";
 import { getAmbientCovers } from "@/lib/music";
 
 const STARTERS = [
@@ -13,6 +16,8 @@ const STARTERS = [
 ];
 
 export default async function Home() {
+  const locale = await getLocale();
+  const t = getDictionary(locale);
   const covers = await getAmbientCovers();
 
   return (
@@ -20,17 +25,17 @@ export default async function Home() {
       <Ambient images={covers} mode="field" />
       <div className="home">
         <section className="hero" aria-labelledby="hero-title">
-          <h1 id="hero-title">Start with a song you love.</h1>
-          <p className="hero-sub">Discover the stories behind the music you love, and where it leads next.</p>
+          <h1 id="hero-title">{t.home.title}</h1>
+          <p className="hero-sub">{t.home.sub}</p>
           <Suspense fallback={<div className="search search-hero search-placeholder" />}>
             <SearchField variant="hero" />
           </Suspense>
           <div className="starters">
-            <span className="starters-label">Or begin with</span>
+            <span className="starters-label">{t.home.beginWith}</span>
             <ul>
               {STARTERS.map((s) => (
                 <li key={s.title}>
-                  <Link href={`/search?q=${encodeURIComponent(`${s.artist} ${s.title}`)}`}>
+                  <Link href={href(locale, `/search?q=${encodeURIComponent(`${s.artist} ${s.title}`)}`)}>
                     {s.title} <span>{s.artist}</span>
                   </Link>
                 </li>

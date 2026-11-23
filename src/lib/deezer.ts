@@ -53,13 +53,16 @@ const slot = createLimiter(6, 105);
 
 export class NotFoundError extends Error {}
 
-async function dz<T extends DzError>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+// Genre names come back in the Accept-Language language.
+const ACCEPT_LANGUAGE: Record<string, string> = { en: "en", pt: "pt-BR", es: "es" };
+
+async function dz<T extends DzError>(path: string, params: Record<string, string | number> = {}, lang = "en"): Promise<T> {
   const url = new URL(API + path);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
 
   for (let attempt = 0; attempt < 3; attempt++) {
     const body = await slot(() =>
-      fetchJson<T>(url.toString(), { source: "Deezer", headers: { "Accept-Language": "en" } }),
+      fetchJson<T>(url.toString(), { source: "Deezer", headers: { "Accept-Language": ACCEPT_LANGUAGE[lang] ?? "en" } }),
     );
     if (!body.error) return body;
     if (body.error.code === 800) throw new NotFoundError(body.error.message);
@@ -86,8 +89,8 @@ export function getTrack(id: number | string) {
   return dz<DzTrack & DzError>(`/track/${id}`);
 }
 
-export function getAlbum(id: number | string) {
-  return dz<DzAlbum & DzError>(`/album/${id}`);
+export function getAlbum(id: number | string, lang = "en") {
+  return dz<DzAlbum & DzError>(`/album/${id}`, {}, lang);
 }
 
 export async function getRelatedArtists(artistId: number, limit = 20) {

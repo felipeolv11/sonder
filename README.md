@@ -19,7 +19,7 @@ npm run dev                  # http://localhost:3000
 | O quê | Fonte | Observações |
 | --- | --- | --- |
 | Busca, capa, álbum, duração, andamento, gravadora | [API do Deezer](https://developers.deezer.com/api) | Não precisa de chave. As requisições são espaçadas para respeitar o limite de 50 a cada 5 segundos. |
-| História da música e do álbum | Wikipedia em inglês (Action API, extratos em texto puro) | Exibida como citação, com links para as seções e atribuição CC BY-SA. Nada é gerado nem reescrito. |
+| História da música e do álbum | Wikipedia (Action API, extratos em texto puro) | Exibida como citação, com links para as seções e atribuição CC BY-SA. Nada é gerado nem reescrito. |
 | Créditos (compositores, produtores, estúdio, data de lançamento, gêneros) | Wikidata | Lidos do item do Wikidata ligado ao artigo da música na Wikipedia. |
 | Recomendações | Artistas relacionados do Deezer, mais gêneros, datas e BPM dos álbuns | Veja abaixo. |
 
@@ -39,7 +39,15 @@ As seções de interpretação e de opinião também ficam marcadas com um filet
 2. Pega uma música popular de cada um, ignorando versões ao vivo, remixes, demos e a própria música buscada.
 3. Se a faixa vier de uma coletânea ou relançamento, tenta encontrar a mesma gravação num lançamento original do artista.
 4. Ordena pela proximidade que o Deezer dá ao artista e, depois, por gênero em comum, proximidade do ano de lançamento e andamento.
-5. Escreve o motivo de cada recomendação só a partir desses dados (por exemplo, "From *Grace* (1994), three years before 'No Surprises'"). Nada é inventado.
+5. Escreve o motivo de cada recomendação só a partir desses dados (por exemplo, "Do álbum *Grace* (1994), três anos antes de 'No Surprises'"). Nada é inventado.
+
+## Idiomas
+
+A interface está em inglês, português (Brasil) e espanhol, em `/en`, `/pt` e `/es`.
+
+- `src/proxy.ts` redireciona endereços sem idioma (`/`, `/song/123`). Usa o idioma escolhido antes pelo visitante (o cookie `NEXT_LOCALE`, salvo pelo menu de idioma); senão, o `Accept-Language` do navegador; senão, inglês.
+- Os textos da interface ficam em `src/i18n/dictionaries.ts`. Para adicionar um idioma, inclua-o em `locales` no `src/i18n/config.ts` e crie o dicionário dele.
+- A história vem da Wikipedia no idioma do leitor quando essa edição tem um artigo substancial, encontrado pelos sitelinks do Wikidata. Caso contrário, aparece o artigo em inglês com um aviso. Créditos e gêneros usam os nomes do Wikidata e do Deezer no mesmo idioma. A camada de dados devolve fatos e motivos de recomendação como dados estruturados, e a interface monta as frases.
 
 ## Estrutura
 
@@ -47,7 +55,9 @@ As seções de interpretação e de opinião também ficam marcadas com um filet
 src/lib/deezer.ts      Cliente do Deezer (com limite de requisições)
 src/lib/wiki.ts        Consultas à Wikipedia e ao Wikidata, identificação de artigos, limite de requisições da Wikimedia
 src/lib/music.ts       Ordenação da busca, montagem da música, história e recomendações ("use cache")
-src/app/               Páginas: / (descobrir), /search, /song/[id], /history, /api/suggest
+src/i18n/              Idiomas, dicionários e formatação de datas, listas e motivos
+src/app/[lang]/        Páginas: início, /search, /song/[id], /history
+src/app/api/suggest/   Sugestões da busca
 src/components/        Barra superior, busca com sugestões, fundo a partir da capa, história, recomendações
 ```
 

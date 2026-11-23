@@ -34,7 +34,9 @@ async function wikimediaFetch(url: string, source: string): Promise<unknown> {
   });
 }
 
-const WP = "https://en.wikipedia.org/w/api.php";
+/** Wikipedia editions the app can read; matches the interface languages. */
+export type WikiLang = "en" | "pt" | "es";
+const wpApi = (lang: WikiLang) => `https://${lang}.wikipedia.org/w/api.php`;
 const WD = "https://www.wikidata.org/w/api.php";
 
 type WpPage = {
@@ -73,16 +75,16 @@ function getJson<T>(url: string, source: string) {
   return sharedGet(url, source) as Promise<T>;
 }
 
-async function wp(params: Record<string, string>): Promise<WpQuery> {
-  const url = new URL(WP);
+async function wp(params: Record<string, string>, lang: WikiLang = "en"): Promise<WpQuery> {
+  const url = new URL(wpApi(lang));
   const all = { action: "query", format: "json", formatversion: "1", redirects: "1", ...params };
   for (const [k, v] of Object.entries(all)) url.searchParams.set(k, v);
   return getJson<WpQuery>(url.toString(), "Wikipedia");
 }
 
-export function articleUrl(title: string, anchor?: string) {
+export function articleUrl(title: string, anchor?: string, lang: WikiLang = "en") {
   const t = encodeURIComponent(title.replace(/ /g, "_"));
-  return `https://en.wikipedia.org/wiki/${t}${anchor ? `#${encodeURIComponent(anchor.replace(/ /g, "_"))}` : ""}`;
+  return `https://${lang}.wikipedia.org/wiki/${t}${anchor ? `#${encodeURIComponent(anchor.replace(/ /g, "_"))}` : ""}`;
 }
 
 function toArticle(p: WpPage): WikiArticle {
@@ -166,11 +168,11 @@ export async function findArtistArticle(artist: string) {
   return findArticle("artist", artist, artist);
 }
 
-/** Full plain-text article split into sections. */
-export async function getSections(title: string): Promise<{ lead: string[]; sections: WikiSection[] }> {
+/** Full plain-text article split into sections, from the given Wikipedia edition. */
+export async function getSections(title: string, lang: WikiLang = "en"): Promise<{ lead: string[]; sections: WikiSection[] }> {
   "use cache";
   cacheLife("days");
-  const res = await wp({ prop: "extracts", explaintext: "1", exsectionformat: "wiki", titles: title });
+  const res = await wp({ prop: "extracts", explaintext: "1", exsectionformat: "wiki", titles: title }, lang);
   const page = Object.values(res.query?.pages ?? {})[0];
   const text = page?.extract ?? "";
   const lines = text.split("\n");
@@ -237,7 +239,25 @@ function itemIds(claims: WdClaim[] | undefined): string[] {
     .filter((x): x is string => !!x);
 }
 
-export async function getWikidataFacts(qid: string): Promise<WikidataFacts> {
+/** Titles of the same article in other Wikipedia editions, from Wikidata sitelinks. */
+export async function getSitelinks(qid: string): Promise<Partial<Record<WikiLang, string>>> {
+  "use cache";
+  cacheLife("days");
+  const res = await wd({ action: "wbgetentities", ids: qid, props: "sitelinks", sitefilter: "enwiki|ptwiki|eswiki" });
+  const links = (res.entities?.[qid] as { sitelinks?: Record<string, { title: string }> } | undefined)?.sitelinks ?? {};
+  const out: Partial<Record<WikiLang, string>> = {};
+  for (const lang of ["en", "pt", "es"] as const) {
+    const t = links[`${lang}wiki`]?.title;
+    if (t) out[lang] = t;
+  }
+  return out;
+}
+
+/**
+ * Credits for a Wikidata item, with names in `lang` (falling back to English).
+ * `partOf` stays in English because it's used to look up the album on Deezer and English Wikipedia.
+ */
+export async function getWikidataFacts(qid: string, lang: WikiLang = "en"): Promise<WikidataFacts> {
   "use cache";
   cacheLife("days");
   const res = await wd({ action: "wbgetentities", ids: qid, props: "claims" });
@@ -248,14 +268,18 @@ export async function getWikidataFacts(qid: string): Promise<WikidataFacts> {
 
   const all = [...new Set(Object.values(ids).flat())].slice(0, 50);
   const labels: Record<string, string> = {};
+  const english: Record<string, string> = {};
   if (all.length) {
-    const lres = await wd({ action: "wbgetentities", ids: all.join("|"), props: "labels", languages: "en", languagefallback: "1" });
+    const languages = lang === "en" ? "en" : `${lang}|en`;
+    const lres = await wd({ action: "wbgetentities", ids: all.join("|"), props: "labels", languages });
     for (const [id, ent] of Object.entries(lres.entities ?? {})) {
-      const l = ent.labels?.en?.value;
-      if (l) labels[id] = l;
+      const en = ent.labels?.en?.value;
+      const local = ent.labels?.[lang]?.value ?? en;
+      if (local) labels[id] = local;
+      if (en) english[id] = en;
     }
   }
-  const named = (key: string) => [...new Set(ids[key].map((id) => labels[id]).filter(Boolean))];
+  const named = (key: string, from = labels) => [...new Set(ids[key].map((id) => from[id]).filter(Boolean))];
 
   let published: WikidataFacts["published"];
   for (const c of claims.P577 ?? []) {
@@ -273,7 +297,7 @@ export async function getWikidataFacts(qid: string): Promise<WikidataFacts> {
     recordedAt: named("recordedAt"),
     labels: named("labels"),
     genres: named("genres"),
-    partOf: [...named("partOfA"), ...named("partOfB")],
+    partOf: [...named("partOfA", english), ...named("partOfB", english)],
     published,
   };
 }

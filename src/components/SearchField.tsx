@@ -2,6 +2,8 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
+import { useDictionary, useLocale } from "@/i18n/client";
+import { href } from "@/i18n/config";
 import type { SongCard } from "@/lib/music";
 
 type Props = { variant: "hero" | "compact"; autoFocus?: boolean };
@@ -10,7 +12,9 @@ export function SearchField({ variant, autoFocus }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const params = useSearchParams();
-  const initial = pathname === "/search" ? (params.get("q") ?? "") : "";
+  const locale = useLocale();
+  const t = useDictionary();
+  const initial = pathname === href(locale, "/search") ? (params.get("q") ?? "") : "";
 
   const [q, setQ] = useState(initial);
   const [items, setItems] = useState<SongCard[]>([]);
@@ -70,8 +74,8 @@ export function SearchField({ variant, autoFocus }: Props) {
   function go(item?: SongCard) {
     setOpen(false);
     inputRef.current?.blur();
-    if (item) router.push(`/song/${item.id}`);
-    else if (q.trim()) router.push(`/search?q=${encodeURIComponent(q.trim())}`);
+    if (item) router.push(href(locale, `/song/${item.id}`));
+    else if (q.trim()) router.push(href(locale, `/search?q=${encodeURIComponent(q.trim())}`));
   }
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
@@ -112,8 +116,8 @@ export function SearchField({ variant, autoFocus }: Props) {
           type="search"
           value={q}
           autoFocus={autoFocus}
-          placeholder="Search a song, artist or album..."
-          aria-label="Search a song, artist or album"
+          placeholder={t.search.placeholder}
+          aria-label={t.search.label}
           role="combobox"
           aria-expanded={showList}
           aria-controls={listId}
@@ -144,9 +148,9 @@ export function SearchField({ variant, autoFocus }: Props) {
       </form>
 
       {showList && (
-        <ul id={listId} role="listbox" className="suggestions" aria-label="Suggested songs">
+        <ul id={listId} role="listbox" className="suggestions" aria-label={t.search.suggestions}>
           {shown.length === 0 ? (
-            <li className="suggestion-empty">No songs match “{q.trim()}”. Try the artist’s name with the title.</li>
+            <li className="suggestion-empty">{t.search.noMatch(q.trim())}</li>
           ) : (
             shown.map((item, i) => (
               <li
@@ -174,7 +178,7 @@ export function SearchField({ variant, autoFocus }: Props) {
           )}
           {shown.length > 0 && (
             <li className="suggestion-all" onMouseDown={(e) => e.preventDefault()} onClick={() => go()}>
-              See all results for “{q.trim()}”
+              {t.search.seeAll(q.trim())}
             </li>
           )}
         </ul>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState } from "react";
+import { useDictionary } from "@/i18n/client";
 
 type Props = {
   paragraphs: string[];
@@ -10,6 +11,7 @@ type Props = {
 
 export function SectionBody({ paragraphs, subsections, initial }: Props) {
   const [open, setOpen] = useState(false);
+  const t = useDictionary();
   const id = useId();
   const total = paragraphs.length + subsections.reduce((n, s) => n + s.paragraphs.length, 0);
   const collapsible = total > initial + 1;
@@ -39,7 +41,7 @@ export function SectionBody({ paragraphs, subsections, initial }: Props) {
       )}
       {collapsible && (
         <button type="button" className="more" aria-expanded={open} aria-controls={id} onClick={() => setOpen((o) => !o)}>
-          {open ? "Show less" : `Continue reading`}
+          {open ? t.story.showLess : t.story.continueReading}
         </button>
       )}
     </div>

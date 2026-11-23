@@ -14,9 +14,9 @@ export function CoverGridSkeleton({ count = 10 }: { count?: number }) {
   );
 }
 
-export function HeroSkeleton() {
+export function HeroSkeleton({ label }: { label: string }) {
   return (
-    <div className="song-hero" aria-busy="true" aria-label="Loading song">
+    <div className="song-hero" aria-busy="true" aria-label={label}>
       <div className="hero-art skeleton" />
       <div className="hero-meta">
         <span className="skeleton skeleton-line" style={{ width: 140 }} />
@@ -28,10 +28,10 @@ export function HeroSkeleton() {
   );
 }
 
-export function StorySkeleton() {
+export function StorySkeleton({ label }: { label: string }) {
   return (
-    <div className="story-loading" aria-busy="true" aria-label="Loading the story">
-      <p className="loading-note">Reading the history of this song…</p>
+    <div className="story-loading" aria-busy="true">
+      <p className="loading-note">{label}</p>
       {[92, 100, 96, 64, 0, 88, 100, 72].map((w, i) =>
         w ? <span key={i} className="skeleton skeleton-line" style={{ width: `${w}%`, height: 15 }} /> : <br key={i} />,
       )}
@@ -39,10 +39,10 @@ export function StorySkeleton() {
   );
 }
 
-export function RecsSkeleton() {
+export function RecsSkeleton({ label }: { label: string }) {
   return (
-    <div aria-busy="true" aria-label="Finding recommendations">
-      <p className="loading-note">Listening for kindred songs…</p>
+    <div aria-busy="true">
+      <p className="loading-note">{label}</p>
       <CoverGridSkeleton count={5} />
     </div>
   );
