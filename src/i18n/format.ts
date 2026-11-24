@@ -8,7 +8,9 @@ export function formatList(locale: Locale, items: string[]) {
 
 /** Formats a Wikidata date at its own precision: day, month or just the year. */
 export function formatDate(locale: Locale, iso: string, precision: number) {
-  const d = new Date(`${iso.slice(0, 10)}T00:00:00Z`);
+  // Wikidata writes unknown parts as zeros ("1997-05-00" for May 1997), which Date rejects.
+  const [y, m, day] = iso.slice(0, 10).split("-").map(Number);
+  const d = new Date(Date.UTC(y, Math.max(m, 1) - 1, Math.max(day, 1)));
   if (precision < 10 || Number.isNaN(d.getTime())) return iso.slice(0, 4);
   const opts: Intl.DateTimeFormatOptions =
     precision >= 11 ? { day: "numeric", month: "long", year: "numeric", timeZone: "UTC" } : { month: "long", year: "numeric", timeZone: "UTC" };
