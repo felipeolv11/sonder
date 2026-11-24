@@ -25,8 +25,6 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
     );
   }
 
-  const kinds = new Set<StoryKind>([...story.sections, ...(story.album?.sections ?? [])].map((s) => s.kind));
-  const legend = (["documented", "interpretation", "opinion"] as StoryKind[]).filter((k) => kinds.has(k));
   // Blocks read from another Wikipedia edition get a note; untranslated ones keep their own lang attribute.
   const foreign = (lang?: Lang, translated?: boolean) => (lang && lang !== locale && !translated ? { lang: localeTags[lang] } : {});
   const sourceNote = (lang?: Lang, translated?: boolean) =>
@@ -39,16 +37,7 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
     <div className="story-body">
       {story.focus !== "song" && <p className="story-note">{story.focus === "album" ? t.story.noSongAlbum : t.story.noSongArtist}</p>}
 
-      {legend.length > 1 && (
-        <ul className="legend" aria-label={t.story.legend}>
-          {legend.map((k) => (
-            <li key={k} data-kind={k}>
-              <span className="kind-dot" aria-hidden="true" />
-              <strong>{t.story.kinds[k]}</strong> {t.story.kindHelp[k]}
-            </li>
-          ))}
-        </ul>
-      )}
+      <Legend sections={[...story.sections, ...(story.album?.sections ?? [])]} t={t} />
 
       {sourceNote(story.songLang, story.songTranslated)}
       <div {...foreign(story.songLang, story.songTranslated)}>
@@ -93,19 +82,12 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
         </section>
       )}
 
-      <footer className="license">
-        {t.story.license[0]}{" "}
-        <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">
-          CC BY-SA 4.0
-        </a>
-        {t.story.license[1]}
-        {anyTranslated && t.story.licenseTranslated}
-      </footer>
+      <License t={t} translated={anyTranslated} />
     </div>
   );
 }
 
-function Section({ section, t, small }: { section: StorySection; t: Dictionary; small?: boolean }) {
+export function Section({ section, t, small }: { section: StorySection; t: Dictionary; small?: boolean }) {
   const Heading = small ? "h4" : "h3";
   return (
     <section className={`story-section${small ? " small" : ""}`} data-kind={section.kind}>
@@ -122,12 +104,42 @@ function Section({ section, t, small }: { section: StorySection; t: Dictionary; 
   );
 }
 
-function SourceLine({ t, title, url, section }: { t: Dictionary; title: string; url: string; section?: string }) {
+export function SourceLine({ t, title, url, section }: { t: Dictionary; title: string; url: string; section?: string }) {
   return (
     <p className="source">
       <a href={url} target="_blank" rel="noreferrer">
         {t.story.source(title, section)}
       </a>
     </p>
+  );
+}
+
+/** Explains the markers, when a story mixes more than one kind of section. */
+export function Legend({ sections, t }: { sections: StorySection[]; t: Dictionary }) {
+  const kinds = new Set<StoryKind>(sections.map((s) => s.kind));
+  const legend = (["documented", "interpretation", "opinion"] as StoryKind[]).filter((k) => kinds.has(k));
+  if (legend.length < 2) return null;
+  return (
+    <ul className="legend" aria-label={t.story.legend}>
+      {legend.map((k) => (
+        <li key={k} data-kind={k}>
+          <span className="kind-dot" aria-hidden="true" />
+          <strong>{t.story.kinds[k]}</strong> {t.story.kindHelp[k]}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+export function License({ t, translated }: { t: Dictionary; translated: boolean }) {
+  return (
+    <footer className="license">
+      {t.story.license[0]}{" "}
+      <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">
+        CC BY-SA 4.0
+      </a>
+      {t.story.license[1]}
+      {translated && t.story.licenseTranslated}
+    </footer>
   );
 }

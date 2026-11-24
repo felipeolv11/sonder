@@ -5,11 +5,11 @@ import { Suspense } from "react";
 import { Ambient } from "@/components/Ambient";
 import { RecordVisit } from "@/components/history";
 import { Recommendations } from "@/components/Recommendations";
+import { FactsPanel } from "@/components/FactsPanel";
 import { HeroSkeleton, RecsSkeleton, StorySkeleton } from "@/components/Skeletons";
 import { StoryView } from "@/components/StoryView";
 import { hasLocale, href, localeTags, locales, type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
-import { formatFact } from "@/i18n/format";
 import { getLocale } from "@/i18n/server";
 import { getSong, type Song } from "@/lib/music";
 
@@ -75,7 +75,15 @@ async function SongView({ params, locale }: { params: Props["params"]; locale: L
             <StoryView id={song.id} locale={locale} />
           </Suspense>
         </article>
-        <FactsPanel song={song} locale={locale} />
+        <FactsPanel
+          facts={song.facts}
+          locale={locale}
+          sources={t.song.sources}
+          links={[
+            ...(song.songArticle ? [{ label: t.song.readWikipedia, url: song.songArticle.url }] : []),
+            { label: t.song.viewDeezer, url: song.deezerUrl },
+          ]}
+        />
       </div>
 
       <section className="recs" aria-labelledby="recs-title">
@@ -100,7 +108,7 @@ function Hero({ song, locale }: { song: Song; locale: Locale }) {
         <img src={song.album.cover} alt={t.cover(song.album.title)} width={1000} height={1000} />
       </div>
       <div className="hero-meta">
-        <Link className="hero-artist" href={href(locale, `/search?q=${encodeURIComponent(song.artist.name)}`)}>
+        <Link className="hero-artist" href={href(locale, `/artist/${song.artist.id}`)}>
           {song.artist.name}
         </Link>
         <h1 id="song-title" className={song.title.length > 28 ? "long" : undefined}>
@@ -109,7 +117,11 @@ function Hero({ song, locale }: { song: Song; locale: Locale }) {
         <dl className="hero-details">
           <div>
             <dt>{kind}</dt>
-            <dd>{song.album.title}</dd>
+            <dd>
+              <Link className="hero-link" href={href(locale, `/album/${song.album.id}`)}>
+                {song.album.title}
+              </Link>
+            </dd>
           </div>
           {song.year && (
             <div>
@@ -126,46 +138,5 @@ function Hero({ song, locale }: { song: Song; locale: Locale }) {
         </dl>
       </div>
     </section>
-  );
-}
-
-function FactsPanel({ song, locale }: { song: Song; locale: Locale }) {
-  const t = getDictionary(locale).song;
-  return (
-    <aside className="facts glass" aria-labelledby="facts-title">
-      <h2 id="facts-title">{t.onRecord}</h2>
-      {song.facts.length > 0 ? (
-        <dl>
-          {song.facts.map((f) => {
-            const { label, value } = formatFact(locale, f);
-            return (
-              <div key={f.key} className="fact">
-                <dt>{label}</dt>
-                <dd title={t.sourceTitle(f.source)}>{value}</dd>
-              </div>
-            );
-          })}
-        </dl>
-      ) : (
-        <p className="facts-empty">{t.noCredits}</p>
-      )}
-      <div className="facts-sources">
-        <p>{t.sources}</p>
-        <ul>
-          {song.songArticle && (
-            <li>
-              <a href={song.songArticle.url} target="_blank" rel="noreferrer">
-                {t.readWikipedia}
-              </a>
-            </li>
-          )}
-          <li>
-            <a href={song.deezerUrl} target="_blank" rel="noreferrer">
-              {t.viewDeezer}
-            </a>
-          </li>
-        </ul>
-      </div>
-    </aside>
   );
 }

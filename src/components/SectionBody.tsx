@@ -3,9 +3,11 @@
 import { useId, useState } from "react";
 import { useDictionary } from "@/i18n/client";
 
+type Sub = { heading: string; paragraphs: string[] };
+
 type Props = {
   paragraphs: string[];
-  subsections: { heading: string; paragraphs: string[] }[];
+  subsections: Sub[];
   initial: number;
 };
 
@@ -14,28 +16,31 @@ export function SectionBody({ paragraphs, subsections, initial }: Props) {
   const t = useDictionary();
   const id = useId();
   const total = paragraphs.length + subsections.reduce((n, s) => n + s.paragraphs.length, 0);
-  const collapsible = total > initial + 1;
+  const long = total > initial + 1;
 
-  const lead = collapsible ? paragraphs.slice(0, initial) : paragraphs;
-  const restParagraphs = collapsible ? paragraphs.slice(initial) : [];
+  const lead = long ? paragraphs.slice(0, initial) : paragraphs;
+  // A section that is all subsections ("History" on an artist page) opens with its first one,
+  // rather than a heading followed by nothing but "Continue reading".
+  const openSubs = long && paragraphs.length === 0 ? subsections.slice(0, 1) : [];
+  const restParagraphs = long ? paragraphs.slice(initial) : [];
+  const restSubs = long ? subsections.slice(openSubs.length) : subsections;
+  const collapsible = long && (restParagraphs.length > 0 || restSubs.length > 0);
 
   return (
     <div className="prose">
       {lead.map((p, i) => (
         <p key={i}>{p}</p>
       ))}
+      {openSubs.map((s) => (
+        <Subsection key={s.heading} {...s} />
+      ))}
       {(!collapsible || open) && (
         <div id={id} className={collapsible ? "prose-more" : undefined}>
           {restParagraphs.map((p, i) => (
             <p key={i}>{p}</p>
           ))}
-          {subsections.map((s) => (
-            <div key={s.heading} className="subsection">
-              <h4>{s.heading}</h4>
-              {s.paragraphs.map((p, i) => (
-                <p key={i}>{p}</p>
-              ))}
-            </div>
+          {restSubs.map((s) => (
+            <Subsection key={s.heading} {...s} />
           ))}
         </div>
       )}
@@ -44,6 +49,17 @@ export function SectionBody({ paragraphs, subsections, initial }: Props) {
           {open ? t.story.showLess : t.story.continueReading}
         </button>
       )}
+    </div>
+  );
+}
+
+function Subsection({ heading, paragraphs }: Sub) {
+  return (
+    <div className="subsection">
+      <h4>{heading}</h4>
+      {paragraphs.map((p, i) => (
+        <p key={i}>{p}</p>
+      ))}
     </div>
   );
 }

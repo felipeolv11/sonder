@@ -14,10 +14,10 @@ export function CoverGridSkeleton({ count = 10 }: { count?: number }) {
   );
 }
 
-export function HeroSkeleton({ label }: { label: string }) {
+export function HeroSkeleton({ label, round }: { label: string; round?: boolean }) {
   return (
     <div className="song-hero" aria-busy="true" aria-label={label}>
-      <div className="hero-art skeleton" />
+      <div className={`hero-art skeleton${round ? " round" : ""}`} />
       <div className="hero-meta">
         <span className="skeleton skeleton-line" style={{ width: 140 }} />
         <span className="skeleton skeleton-line" style={{ width: "80%", height: 56, marginTop: 14 }} />

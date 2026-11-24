@@ -7,7 +7,9 @@ export type DzArtist = {
   name: string;
   picture_xl?: string;
   picture_big?: string;
+  picture_medium?: string;
   nb_fan?: number;
+  nb_album?: number;
 };
 
 export type DzAlbumRef = {
@@ -40,6 +42,8 @@ export type DzAlbum = DzAlbumRef & {
   release_date?: string;
   label?: string;
   nb_tracks?: number;
+  /** Total length in seconds. */
+  duration?: number;
   genres?: { data: { id: number; name: string }[] };
   artist: DzArtist;
   tracks?: { data: DzTrack[] };
@@ -91,6 +95,21 @@ export function getTrack(id: number | string) {
 
 export function getAlbum(id: number | string, lang = "en") {
   return dz<DzAlbum & DzError>(`/album/${id}`, {}, lang);
+}
+
+export async function searchArtists(q: string, limit = 5) {
+  const res = await dz<DzList<DzArtist>>("/search/artist", { q, limit });
+  return res.data ?? [];
+}
+
+export function getArtist(id: number | string) {
+  return dz<DzArtist & DzError>(`/artist/${id}`);
+}
+
+/** The artist's releases as main artist: albums, EPs, singles and compilations, newest first. */
+export async function getArtistAlbums(artistId: number, limit = 100) {
+  const res = await dz<DzList<DzAlbum>>(`/artist/${artistId}/albums`, { limit });
+  return res.data ?? [];
 }
 
 export async function getRelatedArtists(artistId: number, limit = 20) {

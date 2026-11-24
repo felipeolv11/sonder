@@ -1,6 +1,6 @@
 # Sonder
 
-Um app de descoberta musical. Busque uma música para ver a capa, a história documentada por trás dela e do álbum, e dez músicas que você talvez goste em seguida. Não há reprodução de áudio.
+Um app de descoberta musical. Busque uma música para ver a capa, a história documentada por trás dela e do álbum, e dez músicas que você talvez goste em seguida. Cada artista e cada álbum também têm uma página própria, com biografia, discografia, faixas e créditos. Não há reprodução de áudio.
 
 **No ar:** https://sonder-zeta-khaki.vercel.app
 
@@ -18,9 +18,9 @@ npm run dev                  # http://localhost:3000
 
 | O quê | Fonte | Observações |
 | --- | --- | --- |
-| Busca, capa, álbum, duração, andamento, gravadora | [API do Deezer](https://developers.deezer.com/api) | Não precisa de chave. As requisições são espaçadas para respeitar o limite de 50 a cada 5 segundos. |
-| História da música e do álbum | Wikipedia (Action API, extratos em texto puro) | Exibida como citação, com links para as seções e atribuição CC BY-SA. Nada é gerado nem reescrito; a única transformação é a tradução automática, sempre sinalizada (veja Idiomas). |
-| Créditos (compositores, produtores, estúdio, data de lançamento, gêneros) | Wikidata | Lidos do item do Wikidata ligado ao artigo da música na Wikipedia. |
+| Busca, capa, álbum, faixas, discografia, duração, andamento, gravadora | [API do Deezer](https://developers.deezer.com/api) | Não precisa de chave. As requisições são espaçadas para respeitar o limite de 50 a cada 5 segundos. |
+| História da música, do álbum e biografia do artista | Wikipedia (Action API, extratos em texto puro) | Exibida como citação, com links para as seções e atribuição CC BY-SA. Nada é gerado nem reescrito; a única transformação é a tradução automática, sempre sinalizada (veja Idiomas). |
+| Créditos (compositores, produtores, estúdio, data de lançamento, gêneros) | Wikidata | Lidos do item do Wikidata ligado ao artigo da música ou do álbum na Wikipedia. |
 | Recomendações | Artistas relacionados do Deezer, mais gêneros, datas e BPM dos álbuns | Veja abaixo. |
 
 ### Separando fatos de interpretação
@@ -41,6 +41,12 @@ As seções de interpretação e de opinião também ficam marcadas com um filet
 4. Ordena pela proximidade que o Deezer dá ao artista e, depois, por gênero em comum, proximidade do ano de lançamento e andamento.
 5. Escreve o motivo de cada recomendação só a partir desses dados (por exemplo, "Do álbum *Grace* (1994), três anos antes de 'No Surprises'"). Nada é inventado.
 
+### Páginas de artista e de álbum
+
+- **Artista** (`/artist/[id]`): biografia da Wikipedia, as dez músicas mais tocadas no Deezer, álbuns, singles e EPs (sem coletâneas, e sem repetir o mesmo título), e os artistas que o Deezer relaciona a ele.
+- **Álbum** (`/album/[id]`): faixas, a história do álbum na Wikipedia e a ficha técnica. A data de lançamento vem do Wikidata quando existe, porque a do Deezer costuma ser a de uma reedição. Para singles sem artigo próprio, usa o artigo da música.
+- A página da música leva ao artista e ao álbum, e a busca mostra o artista e os álbuns quando o termo buscado traz o nome do artista.
+
 ## Idiomas
 
 A interface está em inglês, português (Brasil) e espanhol, em `/en`, `/pt` e `/es`.
@@ -56,9 +62,9 @@ src/lib/deezer.ts      Cliente do Deezer (com limite de requisições)
 src/lib/wiki.ts        Consultas à Wikipedia e ao Wikidata, identificação de artigos, limite de requisições da Wikimedia
 src/lib/music.ts       Ordenação da busca, montagem da música, história e recomendações ("use cache")
 src/i18n/              Idiomas, dicionários e formatação de datas, listas e motivos
-src/app/[lang]/        Páginas: início, /search, /song/[id], /history
+src/app/[lang]/        Páginas: início, /search, /song/[id], /artist/[id], /album/[id], /history
 src/app/api/suggest/   Sugestões da busca
-src/components/        Barra superior, busca com sugestões, fundo a partir da capa, história, recomendações
+src/components/        Barra superior, busca com sugestões, fundo a partir da capa, história, recomendações, listas de faixas e capas
 ```
 
 Os resultados ficam em cache com os Cache Components do Next.js (`"use cache"`). Músicas, histórias e recomendações ficam guardadas por dias. Resultados sem os dados da Wikipedia por causa de alguma falha ficam só alguns minutos, e erros não entram no cache. O histórico fica salvo no localStorage do navegador.

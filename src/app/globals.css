@@ -1234,6 +1234,207 @@ p {
   font-variant-numeric: tabular-nums;
 }
 
+/* ===================================================================
+   Artist and album pages
+   =================================================================== */
+
+.hero-art.round,
+.hero-art.round img {
+  border-radius: 50%;
+}
+.hero-eyebrow {
+  font-size: 19px;
+  font-weight: 500;
+  color: var(--label-2);
+  letter-spacing: -0.01em;
+}
+.hero-link {
+  transition: color 0.15s;
+}
+.hero-link:hover {
+  color: var(--accent);
+}
+
+/* Beside a long biography the list scrolls with the page rather than sticking. */
+.side-list {
+  position: static;
+}
+.side-note {
+  font-size: 12.5px;
+  color: var(--label-3);
+  margin: -4px 0 8px;
+}
+
+.tracklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.track {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 48px;
+  padding: 6px 8px;
+  margin: 0 -8px;
+  border-radius: 8px;
+  transition: background-color 0.15s;
+}
+.tracklist.top .track {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+}
+.tracklist li + li .track {
+  box-shadow: 0 -1px 0 var(--separator);
+}
+.track:hover {
+  background: var(--fill);
+  box-shadow: none;
+}
+.tracklist li:hover + li .track {
+  box-shadow: none;
+}
+.track-n {
+  font-size: 13.5px;
+  color: var(--label-3);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.track-art {
+  width: 40px;
+  height: 40px;
+  border-radius: 4px;
+  object-fit: cover;
+  background: var(--fill);
+}
+.track-main {
+  display: grid;
+  min-width: 0;
+}
+.track-title,
+.track-sub {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.track-title {
+  font-size: 14.5px;
+  font-weight: 500;
+}
+.track-sub {
+  font-size: 12.5px;
+  color: var(--label-2);
+}
+.track-time {
+  font-size: 13px;
+  color: var(--label-3);
+  font-variant-numeric: tabular-nums;
+}
+
+.album-tracks {
+  margin-bottom: clamp(64px, 8vw, 96px);
+}
+.album-tracks .section-title {
+  margin-bottom: 18px;
+}
+
+.shelf {
+  margin-top: clamp(80px, 10vw, 128px);
+}
+
+.recs .section-title a {
+  transition: color 0.15s;
+}
+.recs .section-title a:hover {
+  color: var(--accent);
+}
+
+.artist-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  gap: 36px 24px;
+}
+.artist-tile {
+  display: grid;
+  min-width: 0;
+  text-align: center;
+}
+.artist-frame {
+  display: block;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--fill);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    0 14px 34px -16px rgba(0, 0, 0, 0.7);
+  transition: transform 0.35s var(--ease);
+}
+.artist-frame img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.artist-tile:hover .artist-frame {
+  transform: translateY(-3px);
+}
+.artist-tile .tile-title {
+  white-space: normal;
+  text-wrap: balance;
+}
+
+/* Search: artist and albums alongside the songs */
+
+.artist-result {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  max-width: 100%;
+  padding: 12px 22px 12px 12px;
+  margin-bottom: 44px;
+  border-radius: 999px;
+  transition: background-color 0.15s;
+}
+.artist-result:hover {
+  background: var(--glass-strong);
+}
+.artist-result img {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+  background: var(--fill);
+}
+.artist-result > span {
+  display: grid;
+  min-width: 0;
+}
+.artist-result-kind {
+  font-size: 12px;
+  color: var(--label-3);
+}
+.artist-result-name {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+}
+.artist-result-cta {
+  font-size: 13px;
+  color: var(--label-2);
+}
+.results-group + .results-group {
+  margin-top: 64px;
+}
+.results-title {
+  font-size: 15px;
+  font-weight: 600;
+  margin-bottom: 18px;
+}
+
 /* Loading */
 
 .skeleton {
@@ -1347,6 +1548,16 @@ p {
   .cover-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 36px 16px;
+  }
+  .artist-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 28px 14px;
+  }
+  .hero-art.round {
+    max-width: 300px;
+  }
+  .artist-result {
+    border-radius: var(--r-panel);
   }
   .recent-row {
     grid-template-columns: minmax(0, 1fr);
