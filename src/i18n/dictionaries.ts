@@ -177,8 +177,10 @@ const en = {
   },
   timeline: {
     title: "Timeline",
+    previous: "Earlier releases",
+    next: "Later releases",
     loading: "Lining up the releases…",
-    note: "Albums and EPs year by year. Dates come from Wikidata when it lists the release, otherwise from Deezer, which sometimes gives a reissue date.",
+    note: "Albums and EPs in the order they came out. Dates come from Wikidata where it has them, otherwise from Deezer.",
     events: {
       formed: "Formed",
       born: "Born",
@@ -382,8 +384,10 @@ const pt: Dictionary = {
   },
   timeline: {
     title: "Linha do tempo",
+    previous: "Lançamentos anteriores",
+    next: "Lançamentos seguintes",
     loading: "Organizando os lançamentos…",
-    note: "Álbuns e EPs ano a ano. As datas vêm do Wikidata quando ele registra o lançamento; senão, do Deezer, que às vezes traz a data de uma reedição.",
+    note: "Álbuns e EPs na ordem em que saíram. As datas vêm do Wikidata quando ele as registra; senão, do Deezer.",
     events: {
       formed: "Formação",
       born: "Nascimento",
@@ -585,8 +589,10 @@ const es: Dictionary = {
   },
   timeline: {
     title: "Línea de tiempo",
+    previous: "Lanzamientos anteriores",
+    next: "Lanzamientos siguientes",
     loading: "Ordenando los lanzamientos…",
-    note: "Álbumes y EP año a año. Las fechas vienen de Wikidata cuando registra el lanzamiento; si no, de Deezer, que a veces da la fecha de una reedición.",
+    note: "Álbumes y EP en el orden en que salieron. Las fechas vienen de Wikidata cuando las registra; si no, de Deezer.",
     events: {
       formed: "Formación",
       born: "Nacimiento",
