@@ -71,18 +71,21 @@ vi.mock("@/lib/deezer", () => ({
   searchAlbums: async () => [],
 }));
 
+// What the Wikipedia lookups return; individual tests set these.
+const wiki: { songArticle: object | null; facts: object | null } = { songArticle: null, facts: null };
+
 vi.mock("@/lib/wiki", () => ({
   articleUrl: (t: string) => `https://en.wikipedia.org/wiki/${t}`,
-  findSongArticle: async () => null,
+  findSongArticle: async () => wiki.songArticle,
   findAlbumArticle: async () => null,
   findArtistArticle: async () => null,
   getSections: async () => ({ lead: [], sections: [] }),
   getSitelinks: async () => ({}),
-  getWikidataFacts: async () => null,
+  getWikidataFacts: async () => wiki.facts,
   getArtistEvents: async () => ({}),
   getReleaseDates: async () => [],
   translateTexts: async (texts: string[]) => texts,
-  publishedYear: () => undefined,
+  publishedYear: (f: { published?: { iso: string } } | null) => (f?.published ? Number(f.published.iso.slice(0, 4)) : undefined),
 }));
 
 // Results Deezer might return for "radiohead creep".
@@ -98,7 +101,7 @@ const searchResults: DzTrack[] = [
   track(9005, "Creep - Live", radiohead, album(1103, "Live in Paris", radiohead, { year: 2001, genre: "Rock" })),
 ];
 
-const { getRecommendations, searchSongs } = await import("@/lib/music");
+const { getRecommendations, getSong, searchSongs } = await import("@/lib/music");
 
 describe("getRecommendations", async () => {
   const recs = await getRecommendations(seed.id, "en");
@@ -150,5 +153,35 @@ describe("searchSongs", () => {
     expect(results.filter((r) => r.artist === "Radiohead")).toHaveLength(1);
     // Karaoke stays, but below the original.
     expect(results.findIndex((r) => r.artist === "Karaoke Kings")).toBeGreaterThan(0);
+  });
+});
+
+describe("getSong with an article about the composition", () => {
+  it("keeps only the songwriters from it, and dates the recording by its album", async () => {
+    wiki.songArticle = { title: "Waters of March", url: "https://en.wikipedia.org/wiki/Waters_of_March", wikidataId: "Q249859", intro: "", cover: true };
+    wiki.facts = {
+      composers: ["Antônio Carlos Jobim"],
+      lyricists: [],
+      writers: [],
+      producers: ["The Original Producer"],
+      recordedAt: ["The Original Studio"],
+      labels: ["The Original Label"],
+      genres: [],
+      partOf: ["The Original Album"],
+      published: { iso: "1972-01-01T00:00:00Z", precision: 9 },
+    };
+    try {
+      const song = await getSong(seed.id, "en");
+      expect(song?.songArticle).toMatchObject({ title: "Waters of March", cover: true });
+      expect(song?.facts).toContainEqual({ key: "writtenBy", source: "Wikidata", values: ["Antônio Carlos Jobim"] });
+      expect(song?.facts.map((f) => f.key)).not.toContain("producedBy");
+      expect(song?.facts.map((f) => f.key)).not.toContain("released");
+      // The label and year are this recording's, from Deezer, not the original's.
+      expect(song?.facts).toContainEqual({ key: "label", source: "Deezer", values: ["EMI"] });
+      expect(song?.year).toBe(1997);
+    } finally {
+      wiki.songArticle = null;
+      wiki.facts = null;
+    }
   });
 });

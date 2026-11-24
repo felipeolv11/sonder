@@ -28,6 +28,16 @@ describe("matches: is this Wikipedia page about this song?", () => {
     expect(matches(page("Creep (TLC song)", "1994 single by TLC"), "song", "Creep", "Radiohead")).toBe(false);
   });
 
+  it("doesn't take another artist's song as this recording's article just because it mentions the cover", () => {
+    const hallelujah = page(
+      "Hallelujah (Leonard Cohen song)",
+      "1984 single by Leonard Cohen",
+      "\"Hallelujah\" is a song by Leonard Cohen. A version by Jeff Buckley became the best known.",
+    );
+    expect(matches(hallelujah, "song", "Hallelujah", "Jeff Buckley")).toBe(false);
+    expect(matches(hallelujah, "song", "Hallelujah", "Leonard Cohen")).toBe(true);
+  });
+
   it("rejects pages that aren't songs, even by the right artist", () => {
     expect(matches(page("Pablo Honey", "1993 studio album by Radiohead"), "song", "Pablo Honey", "Radiohead")).toBe(false);
   });
@@ -65,12 +75,71 @@ describe("findSongArticle", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  // The English article is filed as "Waters of March", about Jobim's composition; Elis Regina's
+  // recording is only mentioned under "Versions".
+  const watersOfMarch = page(
+    "Waters of March",
+    "Brazilian song",
+    "\"Waters of March\" (Portuguese: \"Águas de Março\") is a Brazilian song composed by Antônio Carlos Jobim in 1972.",
+  );
+  const fullText = (mentionsElis: boolean) =>
+    new Response(
+      JSON.stringify({
+        query: {
+          pages: {
+            "1": {
+              title: "Waters of March",
+              extract: [
+                "\"Waters of March\" is a Brazilian song composed by Antônio Carlos Jobim.",
+                "== Versions ==",
+                mentionsElis ? "Brazilian singer Elis Regina recorded a version of this song in 1972." : "It has been recorded by many singers.",
+              ].join("\n"),
+            },
+          },
+        },
+      }),
+    );
+
+  it("finds a cover's song article through a redirect and the full text, and flags it", async () => {
+    fetchMock
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            query: {
+              // Deezer's "Águas De Março" is also tried as "Águas de Março", which redirects.
+              redirects: [{ from: "Águas de Março", to: "Waters of March" }],
+              pages: {
+                "-1": { title: "Águas De Março (Elis Regina song)", missing: "" },
+                "-2": { title: "Águas De Março", missing: "" },
+                "1": watersOfMarch,
+              },
+            },
+          }),
+        ),
+      )
+      .mockResolvedValueOnce(respond([]))
+      .mockResolvedValueOnce(fullText(true));
+    const article = await findSongArticle("Águas De Março", "Elis Regina");
+    expect(article?.title).toBe("Waters of March");
+    expect(article?.cover).toBe(true);
+  });
+
+  it("rejects a song's article that never mentions the artist", async () => {
+    fetchMock
+      .mockResolvedValueOnce(respond([{ title: "Águas de Março (Some Singer song)", missing: "" }, { title: "Águas de Março", missing: "" }]))
+      .mockResolvedValueOnce(respond([{ ...watersOfMarch, index: 1 }]))
+      .mockResolvedValueOnce(fullText(false));
+    expect(await findSongArticle("Águas de Março", "Some Singer")).toBeNull();
+  });
+
   it("falls back to search, and returns nothing rather than another artist's song", async () => {
     fetchMock
       .mockResolvedValueOnce(respond([{ title: "Obscure Song (Some Band song)", missing: "" }, { title: "Obscure Song", missing: "" }]))
-      .mockResolvedValueOnce(respond([page("Obscure Song (Other Band song)", "2004 single by Other Band", "", { index: 1 })]));
+      .mockResolvedValueOnce(respond([page("Obscure Song (Other Band song)", "2004 single by Other Band", "", { index: 1 })]))
+      // It could be a cover, so the full article is read: it never mentions Some Band.
+      .mockResolvedValueOnce(respond([page("Obscure Song (Other Band song)", "", "\"Obscure Song\" is a song by Other Band.\n== Reception ==\nIt was a hit.")]));
     expect(await findSongArticle("Obscure Song", "Some Band")).toBeNull();
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(String(fetchMock.mock.calls[1][0])).toContain("gsrsearch");
   });
 });

@@ -36,6 +36,7 @@ export async function StoryView({ id, locale }: { id: number; locale: Locale }) 
   return (
     <div className="story-body">
       {story.focus !== "song" && <p className="story-note">{story.focus === "album" ? t.story.noSongAlbum : t.story.noSongArtist}</p>}
+      {story.songCover && <p className="story-note">{t.story.coverNote(story.songCover)}</p>}
 
       <Legend sections={[...story.sections, ...(story.album?.sections ?? [])]} t={t} />
 

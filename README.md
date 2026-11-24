@@ -36,6 +36,14 @@ Cada seção da história recebe um rótulo de acordo com o título dela na Wiki
 
 As seções de interpretação e de opinião também ficam marcadas com um filete na lateral. Quando a Wikipedia não tem artigo sobre a música, a página avisa e conta a história do álbum, ou do artista.
 
+### Regravações
+
+Quando o artigo da Wikipedia é sobre a música como composição, e não sobre a gravação buscada, ele também vale. Exemplos: "Águas de Março" na voz da Elis Regina (o artigo é sobre a canção de Tom Jobim) e "Hallelujah" de Jeff Buckley (o artigo é da música de Leonard Cohen). O artigo é aceito se tiver o título da música, mesmo por redirecionamento ("Águas de Março" → "Waters of March") ou entre aspas na primeira frase, e se citar o intérprete em algum ponto do texto. Nesse caso:
+
+- a página avisa que o artigo é sobre a composição e que a gravação é uma das versões dela;
+- da ficha técnica do Wikidata entram só os compositores, porque produtor, estúdio, gravadora e data seriam os da gravação original;
+- o ano vem do álbum da gravação.
+
 ### Como funcionam as recomendações
 
 1. Busca até 14 artistas que o Deezer lista como relacionados ao artista da música.
@@ -79,7 +87,7 @@ Os testes (`tests/`, com Vitest) cobrem as regras do próprio Sonder, sem acessa
 
 - **Recomendações**: um artista por música, nunca o da música buscada; versões ao vivo e músicas com o mesmo título ficam de fora; coletâneas são trocadas pelo álbum original; os motivos e os filtros saem só dos dados disponíveis.
 - **Busca**: a gravação original do artista citado vem primeiro, tributos e versões repetidas saem.
-- **Wikipedia**: quando uma página é aceita como o artigo da música (título, tipo e artista) e a ordem das tentativas de título.
+- **Wikipedia**: quando uma página é aceita como o artigo da música (título, tipo e artista), a ordem das tentativas de título e os artigos de composição das regravações.
 - **Textos**: normalização de títulos, glossário de seções e as frases das recomendações, datas e créditos nos três idiomas.
 
 A cada push e pull request, o GitHub Actions (`.github/workflows/ci.yml`) roda lint, verificação de tipos, testes e build.

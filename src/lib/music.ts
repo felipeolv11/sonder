@@ -56,7 +56,8 @@ export type Song = {
   genres: string[];
   facts: Fact[];
   deezerUrl: string;
-  songArticle?: { title: string; url: string };
+  /** `cover`: the article is about the song as a composition, of which this recording is one version. */
+  songArticle?: { title: string; url: string; cover?: boolean };
   albumName?: string;
   /** Signals the recommender compares candidates against. */
   seed: { genres: string[]; year?: number; bpm?: number; label?: string };
@@ -83,6 +84,8 @@ export type Story = {
    */
   songLang?: Lang;
   songTranslated?: boolean;
+  /** Set to the performer when the song's article is about the composition rather than their recording. */
+  songCover?: string;
   standfirst?: { paragraphs: string[]; source: Source };
   sections: StorySection[];
   album?: { title: string; lang: Lang; translated?: boolean; paragraphs: string[]; sections: StorySection[]; source: Source };
@@ -276,10 +279,13 @@ export async function getSong(id: number, lang: Lang = "en"): Promise<Song | nul
 
   const article = await enrich(findSongArticle(track.title, track.artist.name));
   const songFacts = article?.wikidataId ? await enrich(getWikidataFacts(article.wikidataId, lang)) : null;
+  // An article about the composition (this recording is a cover) has the original's producer, studio,
+  // label, date and album: only the songwriters hold for this recording.
+  const recording = article?.cover ? null : songFacts;
 
   const albumCandidates = [
-    ...(songFacts?.partOf ?? []),
-    ...albumFromIntro(article?.intro ?? ""),
+    ...(recording?.partOf ?? []),
+    ...(article?.cover ? [] : albumFromIntro(article?.intro ?? "")),
   ].filter((n, i, arr) => arr.indexOf(n) === i);
 
   const album = await canonicalAlbum(track, firstAlbum, albumCandidates, lang);
@@ -295,11 +301,11 @@ export async function getSong(id: number, lang: Lang = "en"): Promise<Song | nul
     if (xs && xs.length) facts.push({ key, source: "Wikidata", values: xs.slice(0, 4) });
   };
   names("writtenBy", writers);
-  names("producedBy", songFacts?.producers);
-  names("recordedAt", songFacts?.recordedAt);
-  if (songFacts?.published) facts.push({ key: "released", source: "Wikidata", date: songFacts.published });
-  const label = songFacts?.labels[0] ?? album.label;
-  if (label) facts.push({ key: "label", source: songFacts?.labels[0] ? "Wikidata" : "Deezer", values: [label] });
+  names("producedBy", recording?.producers);
+  names("recordedAt", recording?.recordedAt);
+  if (recording?.published) facts.push({ key: "released", source: "Wikidata", date: recording.published });
+  const label = recording?.labels[0] ?? album.label;
+  if (label) facts.push({ key: "label", source: recording?.labels[0] ? "Wikidata" : "Deezer", values: [label] });
 
   const position = album.tracks?.data.findIndex((t) => sameTitle(t.title, track.title)) ?? -1;
   if (album.record_type === "album" && position >= 0 && album.nb_tracks) {
@@ -309,7 +315,15 @@ export async function getSong(id: number, lang: Lang = "en"): Promise<Song | nul
   facts.push({ key: "length", source: "Deezer", values: [`${m}:${String(track.duration % 60).padStart(2, "0")}`] });
   if (track.bpm && track.bpm > 0) facts.push({ key: "tempo", source: "Deezer", values: [`${Math.round(track.bpm)} BPM`] });
 
-  const year = publishedYear(songFacts) ?? yearOf(album.release_date) ?? yearOf(track.release_date);
+  // Without a date for the recording, the album's first release (Wikidata) beats Deezer's date,
+  // which is often a reissue's: Elis & Tom (1974) is dated 2018 on Deezer.
+  let albumYear: number | undefined;
+  if (!publishedYear(recording) && albumName) {
+    const albumArticle = await enrich(findAlbumArticle(albumName, track.artist.name));
+    const albumFacts = albumArticle?.wikidataId ? await enrich(getWikidataFacts(albumArticle.wikidataId, lang)) : null;
+    albumYear = publishedYear(albumFacts);
+  }
+  const year = publishedYear(recording) ?? albumYear ?? yearOf(album.release_date) ?? yearOf(track.release_date);
   if (degraded) cacheLife("minutes");
   else cacheLife("days");
 
@@ -329,7 +343,7 @@ export async function getSong(id: number, lang: Lang = "en"): Promise<Song | nul
     genres: (wdGenres.length ? wdGenres : dzGenres).slice(0, 3),
     facts,
     deezerUrl: `https://www.deezer.com/track/${track.id}`,
-    songArticle: article ? { title: article.title, url: article.url } : undefined,
+    songArticle: article ? { title: article.title, url: article.url, ...(article.cover ? { cover: true } : {}) } : undefined,
     albumName,
     seed: {
       genres: dzGenres,
@@ -450,6 +464,7 @@ export async function getStory(id: number, lang: Lang = "en"): Promise<Story> {
     if (s.lead.length || s.sections.length) {
       story.focus = "song";
       story.songLang = s.lang;
+      if (songArticle.cover) story.songCover = song.artist.name;
       story.standfirst = { paragraphs: s.lead, source: { title: s.title, url: s.url } };
       story.sections = s.sections;
     }

@@ -56,7 +56,14 @@ export type WpPage = {
   index?: number;
 };
 
-type WpQuery = { query?: { pages?: Record<string, WpPage> } };
+type WpQuery = {
+  query?: {
+    pages?: Record<string, WpPage>;
+    /** Title fixes (first letter capitalised) and redirects applied to the requested titles. */
+    normalized?: { from: string; to: string }[];
+    redirects?: { from: string; to: string }[];
+  };
+};
 
 export type WikiArticle = {
   title: string;
@@ -64,6 +71,11 @@ export type WikiArticle = {
   description?: string;
   wikidataId?: string;
   intro: string;
+  /**
+   * The article is about the song as a composition, and names this artist's recording only
+   * further down (a cover, or a version of a standard): its credits and dates are the original's.
+   */
+  cover?: boolean;
 };
 
 export type WikiSection = {
@@ -94,13 +106,14 @@ export function articleUrl(title: string, anchor?: string, lang: WikiLang = "en"
   return `https://${lang}.wikipedia.org/wiki/${t}${anchor ? `#${encodeURIComponent(anchor.replace(/ /g, "_"))}` : ""}`;
 }
 
-function toArticle(p: WpPage): WikiArticle {
+function toArticle(p: WpPage, cover = false): WikiArticle {
   return {
     title: p.title,
     url: articleUrl(p.title),
     description: p.description,
     wikidataId: p.pageprops?.wikibase_item,
     intro: p.extract ?? "",
+    ...(cover ? { cover: true } : {}),
   };
 }
 
@@ -114,48 +127,115 @@ const KIND_WORDS: Record<Kind, RegExp> = {
   artist: /\b(band|singer|musician|rapper|group|duo|trio|songwriter|composer|producer|dj|artist|vocalist|guitarist|pianist|orchestra|ensemble|collective|act)\b/i,
 };
 
-/** Does this page plausibly describe `name` (a song/album) by `artist`? Exported for tests. */
-export function matches(p: WpPage, kind: Kind, name: string, artist: string): boolean {
-  if (p.missing !== undefined || p.pageprops?.disambiguation !== undefined) return false;
+/**
+ * Does the article's opening name `name` as its subject in quotes? Articles filed under another
+ * title do: "Waters of March" (Portuguese: "Águas de Março") is a Brazilian song…
+ */
+function namedInOpening(p: WpPage, name: string) {
+  const opening = (p.extract ?? "").slice(0, 300);
+  return [...opening.matchAll(/["“]([^"”]{2,80})["”]/g)].some((m) => norm(m[1]) === norm(name));
+}
+
+/**
+ * How well a page fits: "match" when it describes `name` by `artist`; "cover" when it's about the
+ * song `name` but doesn't name `artist` up front, so it may be about the composition (checked
+ * against the full text by the caller); null otherwise. `titleKnown` means the page was reached
+ * by redirect from the song's own title.
+ */
+function judge(p: WpPage, kind: Kind, name: string, artist: string, titleKnown = false): "match" | "cover" | null {
+  if (p.missing !== undefined || p.pageprops?.disambiguation !== undefined) return null;
   const titleCore = p.title.replace(/\s*\([^)]*\)\s*$/, "");
   const paren = /\(([^)]*)\)\s*$/.exec(p.title)?.[1] ?? "";
-  if (norm(titleCore) !== norm(name)) return false;
+  if (!titleKnown && norm(titleCore) !== norm(name) && !namedInOpening(p, name)) return null;
 
   const desc = p.description ?? "";
   const intro = (p.extract ?? "").slice(0, 900);
   const a = norm(artist);
 
   if (kind === "artist") {
-    return KIND_WORDS.artist.test(desc) || KIND_WORDS.artist.test(paren) || KIND_WORDS.artist.test(intro.slice(0, 300));
+    return KIND_WORDS.artist.test(desc) || KIND_WORDS.artist.test(paren) || KIND_WORDS.artist.test(intro.slice(0, 300)) ? "match" : null;
   }
   const kindOk = KIND_WORDS[kind].test(desc) || KIND_WORDS[kind].test(paren) || KIND_WORDS[kind].test(intro.slice(0, 250));
+  if (!kindOk) return null;
   const artistOk = norm(desc).includes(a) || norm(paren).includes(a) || norm(intro).includes(a);
-  return kindOk && artistOk;
+  // The title or description may credit someone else ("Hallelujah (Leonard Cohen song)", "1984
+  // single by Leonard Cohen") while the opening mentions this artist's famous version: a cover too.
+  const credited = /^(.+?)\s+(?:song|single)$/i.exec(paren)?.[1] ?? /\b(?:song|single) by (.+)$/i.exec(desc)?.[1];
+  const creditsSomeoneElse = kind === "song" && !!credited && !norm(credited).includes(a) && !a.includes(norm(credited));
+  if (artistOk && !creditsSomeoneElse) return "match";
+  // Only songs are recorded by others; an album by someone else is just another album.
+  return kind === "song" ? "cover" : null;
 }
+
+/** Does this page plausibly describe `name` (a song/album) by `artist`, by its opening alone? Exported for tests. */
+export function matches(p: WpPage, kind: Kind, name: string, artist: string): boolean {
+  return judge(p, kind, name, artist) === "match";
+}
+
+/** Does the full article mention the artist (in a "Versions" section, for example)? */
+async function mentions(title: string, artist: string) {
+  const { lead, sections } = await getSections(title, "en");
+  const text = norm([...lead, ...sections.flatMap((s) => [s.heading, ...s.paragraphs])].join(" "));
+  return text.includes(norm(artist));
+}
+
+// Wikipedia titles are case-sensitive after the first letter, and keep short words lowercase
+// ("Águas de Março"), while Deezer often capitalises every word ("Águas De Março").
+const MINOR = new Set("a an and as at by com con da das de del do dos e el em en for from in la las los na no o of on or para por the to y".split(" "));
+const minorWordsLower = (s: string) => s.split(" ").map((w, i) => (i > 0 && MINOR.has(w.toLowerCase()) ? w.toLowerCase() : w)).join(" ");
 
 async function findArticle(kind: Kind, name: string, artist: string): Promise<WikiArticle | null> {
   const clean = kind === "artist" ? name : baseTitle(name);
+  const plain = minorWordsLower(clean) !== clean ? [minorWordsLower(clean)] : [];
   const guesses =
     kind === "song"
-      ? [`${clean} (${artist} song)`, `${clean} (song)`, clean]
+      ? [`${clean} (${artist} song)`, `${clean} (song)`, clean, ...plain]
       : kind === "album"
-        ? [`${clean} (${artist} album)`, `${clean} (album)`, `${clean} (EP)`, clean]
+        ? [`${clean} (${artist} album)`, `${clean} (album)`, `${clean} (EP)`, clean, ...plain]
         : [`${clean} (band)`, `${clean} (musician)`, `${clean} (singer)`, `${clean} (rapper)`, clean];
 
   const direct = await wp({ ...INFO, titles: guesses.join("|") });
   const pages = Object.values(direct.query?.pages ?? {});
+  // Follow the title fixes and redirects the API applied, to know which page each guess landed on.
+  const hops = [...(direct.query?.normalized ?? []), ...(direct.query?.redirects ?? [])];
+  const landing = (title: string) => {
+    let t = title;
+    for (const h of hops) if (h.from === t) t = h.to;
+    return t;
+  };
+
+  const covers: WpPage[] = [];
   // Prefer the most specific guess that validates.
   for (const g of guesses) {
-    const p = pages.find((x) => norm(x.title) === norm(g)) ?? pages.find((x) => x.title === g);
-    if (p && matches(p, kind, clean, artist)) return toArticle(p);
+    const target = landing(g);
+    const p = pages.find((x) => x.title === target) ?? pages.find((x) => norm(x.title) === norm(g));
+    if (!p) continue;
+    // A redirect from the bare title ("Águas de Março" -> "Waters of March") vouches for the name.
+    const viaRedirect = target !== g && norm(g) === norm(clean);
+    const verdict = judge(p, kind, clean, artist, viaRedirect);
+    if (verdict === "match") return toArticle(p);
+    if (verdict === "cover") covers.push(p);
   }
-  for (const p of pages) if (matches(p, kind, clean, artist)) return toArticle(p);
+  for (const p of pages) if (judge(p, kind, clean, artist) === "match") return toArticle(p);
 
   // Fall back to full-text search.
   const term = kind === "song" ? `"${clean}" ${artist} song` : kind === "album" ? `"${clean}" ${artist} album` : `"${clean}" musician band`;
   const found = await wp({ ...INFO, generator: "search", gsrsearch: term, gsrlimit: "8" });
   const ranked = Object.values(found.query?.pages ?? {}).sort((x, y) => (x.index ?? 0) - (y.index ?? 0));
-  for (const p of ranked) if (matches(p, kind, clean, artist)) return toArticle(p);
+  for (const p of ranked) {
+    const verdict = judge(p, kind, clean, artist);
+    if (verdict === "match") return toArticle(p);
+    if (verdict === "cover") covers.push(p);
+  }
+
+  // A song's article that names this artist only in its body is about the composition, with
+  // this recording as one of its versions. Accept it then, flagged, and only then.
+  const seen = new Set<string>();
+  for (const p of covers) {
+    if (seen.has(p.title)) continue;
+    seen.add(p.title);
+    if (await mentions(p.title, artist)) return toArticle(p, true);
+  }
   return null;
 }
 
