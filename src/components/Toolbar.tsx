@@ -24,7 +24,7 @@ export function Toolbar({ locale }: { locale: Locale }) {
             fallback={
               <nav className="toolbar-nav" aria-label={t.nav.main}>
                 <Link href={href(locale)}>{t.nav.discover}</Link>
-                <Link href={href(locale, "/history")}>{t.nav.history}</Link>
+                <Link href={href(locale, "/library")}>{t.nav.library}</Link>
               </nav>
             }
           >

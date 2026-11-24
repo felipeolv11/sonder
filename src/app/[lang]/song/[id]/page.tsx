@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Ambient } from "@/components/Ambient";
 import { RecordVisit } from "@/components/history";
+import { SongActions } from "@/components/SongActions";
 import { DiscoveryTrail, RecordTrail } from "@/components/trail";
 import { Recommendations } from "@/components/Recommendations";
 import { FactsPanel } from "@/components/FactsPanel";
@@ -140,6 +141,7 @@ function Hero({ song, locale }: { song: Song; locale: Locale }) {
             </div>
           )}
         </dl>
+        <SongActions song={{ id: song.id, title: song.title, artist: song.artist.name, album: song.album.title, cover: song.album.cover }} />
       </div>
     </section>
   );

@@ -58,6 +58,14 @@ São calculadas até 16 recomendações e as dez primeiras aparecem. Os filtros 
 
 A página da música mostra o caminho até ela ("Creep › 1979 › Bullet With Butterfly Wings"). Cada link seguido dentro das páginas de música, artista e álbum acrescenta um passo; uma música aberta pela busca, pela página inicial ou pelo histórico começa um caminho novo; voltar para uma música do caminho o corta ali. O caminho fica no sessionStorage, então cada aba tem o seu (`src/components/trail.tsx`).
 
+### Biblioteca
+
+Na página de cada música dá para **favoritar** e **adicionar a uma lista** (criando uma lista nova ali mesmo). A **Biblioteca** (`/library`) mostra as favoritas, as listas (cada uma em `/library/[id]`) e as músicas exploradas recentemente, com link para o histórico completo. Tudo fica no localStorage do navegador (`src/components/library.tsx`): o app não tem contas e não envia esses dados a lugar nenhum.
+
+### Sobre
+
+A página `/about`, linkada no rodapé, explica de onde vêm as informações, como as histórias separam fatos de interpretação, como as recomendações são escolhidas e o que fica guardado no navegador. O texto dela fica em `src/i18n/about.ts`.
+
 ## Idiomas
 
 A interface está em inglês, português (Brasil) e espanhol, em `/en`, `/pt` e `/es`.
@@ -73,9 +81,11 @@ src/lib/deezer.ts      Cliente do Deezer (com limite de requisições)
 src/lib/wiki.ts        Consultas à Wikipedia e ao Wikidata, identificação de artigos, limite de requisições da Wikimedia
 src/lib/music.ts       Ordenação da busca, montagem da música, história e recomendações ("use cache")
 src/i18n/              Idiomas, dicionários e formatação de datas, listas e motivos
-src/app/[lang]/        Páginas: início, /search, /song/[id], /artist/[id], /album/[id], /history
+src/app/[lang]/        Páginas: início, /search, /song/[id], /artist/[id], /album/[id], /library, /library/[id], /history, /about
 src/app/api/suggest/   Sugestões da busca
 src/components/        Barra superior, busca com sugestões, fundo a partir da capa, história, recomendações, listas de faixas e capas
 ```
 
-Os resultados ficam em cache com os Cache Components do Next.js (`"use cache"`). Músicas, histórias e recomendações ficam guardadas por dias. Resultados sem os dados da Wikipedia por causa de alguma falha ficam só alguns minutos, e erros não entram no cache. O histórico fica salvo no localStorage do navegador.
+Os resultados ficam em cache com os Cache Components do Next.js (`"use cache"`). Músicas, histórias e recomendações ficam guardadas por dias. Resultados sem os dados da Wikipedia por causa de alguma falha ficam só alguns minutos, e erros não entram no cache. O histórico, as favoritas e as listas ficam salvos no localStorage do navegador.
+
+Na Vercel, as funções rodam em São Paulo (`gru1`, em `vercel.json`): fica mais rápido no Brasil, e o Deezer ordena as buscas como para quem está aqui.

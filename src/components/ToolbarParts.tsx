@@ -17,14 +17,15 @@ export function NavLinks() {
   const locale = useLocale();
   const t = useDictionary();
   const home = href(locale);
-  const history = href(locale, "/history");
+  const library = href(locale, "/library");
+  const inLibrary = pathname.startsWith(library) || pathname === href(locale, "/history");
   return (
     <nav className="toolbar-nav" aria-label={t.nav.main}>
       <Link href={home} aria-current={pathname === home ? "page" : undefined}>
         {t.nav.discover}
       </Link>
-      <Link href={history} aria-current={pathname === history ? "page" : undefined}>
-        {t.nav.history}
+      <Link href={library} aria-current={inLibrary ? "page" : undefined}>
+        {t.nav.library}
       </Link>
     </nav>
   );

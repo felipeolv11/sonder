@@ -1,10 +1,11 @@
 import type { Metadata, Viewport } from "next";
 import { Inter, Newsreader } from "next/font/google";
+import Link from "next/link";
 import { notFound } from "next/navigation";
 import { Toolbar } from "@/components/Toolbar";
 import { TrailListener } from "@/components/trail";
 import { LocaleProvider } from "@/i18n/client";
-import { hasLocale, localeTags, locales } from "@/i18n/config";
+import { hasLocale, href, localeTags, locales } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
 import "../globals.css";
 
@@ -54,6 +55,10 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
           <TrailListener />
           <Toolbar locale={lang} />
           <main id="main">{children}</main>
+          <footer className="site-footer">
+            <p>{t.footer.credits}</p>
+            <Link href={href(lang, "/about")}>{t.footer.about}</Link>
+          </footer>
         </LocaleProvider>
       </body>
     </html>
