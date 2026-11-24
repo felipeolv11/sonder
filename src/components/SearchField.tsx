@@ -5,6 +5,7 @@ import { useEffect, useId, useRef, useState, useSyncExternalStore } from "react"
 import { useDictionary, useLocale } from "@/i18n/client";
 import { href } from "@/i18n/config";
 import type { SongCard } from "@/lib/music";
+import { breakTrail } from "./trail";
 
 type Props = { variant: "hero" | "compact"; autoFocus?: boolean };
 
@@ -72,6 +73,8 @@ export function SearchField({ variant, autoFocus }: Props) {
   }, [q]);
 
   function go(item?: SongCard) {
+    // A song picked from search starts a new discovery path.
+    breakTrail();
     setOpen(false);
     inputRef.current?.blur();
     if (item) router.push(href(locale, `/song/${item.id}`));

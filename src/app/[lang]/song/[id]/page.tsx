@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { Suspense } from "react";
 import { Ambient } from "@/components/Ambient";
 import { RecordVisit } from "@/components/history";
+import { DiscoveryTrail, RecordTrail } from "@/components/trail";
 import { Recommendations } from "@/components/Recommendations";
 import { FactsPanel } from "@/components/FactsPanel";
 import { HeroSkeleton, RecsSkeleton, StorySkeleton } from "@/components/Skeletons";
@@ -37,7 +38,8 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function SongPage({ params }: Props) {
   const locale = await getLocale();
   return (
-    <div className="page song-page">
+    // Links followed from here continue the reader's discovery path.
+    <div className="page song-page" data-trail>
       <Suspense
         fallback={
           <>
@@ -63,6 +65,8 @@ async function SongView({ params, locale }: { params: Props["params"]; locale: L
     <>
       <Ambient images={[song.album.cover]} mode="album" />
       <RecordVisit id={song.id} title={song.title} artist={song.artist.name} album={song.album.title} cover={song.album.cover} />
+      <RecordTrail id={song.id} title={song.title} artist={song.artist.name} cover={song.album.coverSmall} />
+      <DiscoveryTrail current={song.id} />
 
       <Hero song={song} locale={locale} />
 

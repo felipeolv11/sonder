@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Newsreader } from "next/font/google";
 import { notFound } from "next/navigation";
 import { Toolbar } from "@/components/Toolbar";
+import { TrailListener } from "@/components/trail";
 import { LocaleProvider } from "@/i18n/client";
 import { hasLocale, localeTags, locales } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
@@ -50,6 +51,7 @@ export default async function RootLayout({ children, params }: LayoutProps<"/[la
           <a className="skip-link" href="#main">
             {t.nav.skip}
           </a>
+          <TrailListener />
           <Toolbar locale={lang} />
           <main id="main">{children}</main>
         </LocaleProvider>

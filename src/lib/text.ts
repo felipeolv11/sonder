@@ -6,6 +6,17 @@ export function baseTitle(title: string): string {
     .trim();
 }
 
+/**
+ * Strips only reissue markers from a release title ("OK Computer (Remastered)", "Discovery - Deluxe
+ * Edition"), keeping ones that make a different record, like "(Live Recordings 2003-2009)".
+ */
+export function editionless(title: string): string {
+  return title
+    .replace(/\s*[([][^)\]]*(remaster|deluxe|edition|anniversary|expanded|bonus|reissue|version)[^)\]]*[)\]]/gi, "")
+    .replace(/\s+-\s+.*(remaster|deluxe|edition|anniversary|expanded).*$/i, "")
+    .trim();
+}
+
 /** Lowercase, accent-free, punctuation-free key used to compare titles and names. */
 export function norm(s: string): string {
   return s

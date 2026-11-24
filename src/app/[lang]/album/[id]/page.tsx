@@ -36,7 +36,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function AlbumPage({ params }: Props) {
   const locale = await getLocale();
   return (
-    <div className="page song-page">
+    <div className="page song-page" data-trail>
       <Suspense
         fallback={
           <>

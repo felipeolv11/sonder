@@ -162,6 +162,34 @@ const en = {
       return `From ${album} (${year}), ${words[n] ?? n} year${n > 1 ? "s" : ""} ${diff > 0 ? "after" : "before"} “${title}”.`;
     },
     label: (label: string) => `Also released on ${label}.`,
+    filterLabel: "Filter recommendations",
+    filters: {
+      all: "All",
+      sameEra: "Same era",
+      lesserKnown: "Lesser known",
+      otherGenre: "Another genre",
+    },
+    filterHelp: {
+      sameEra: "Released within five years of this song.",
+      lesserKnown: "By artists with fewer Deezer fans than most of the others suggested here.",
+      otherGenre: "Tagged with a different genre from this song, for a change of scenery.",
+    },
+  },
+  trail: {
+    label: "Your path",
+    earlier: (n: number) => `+${n} earlier`,
+  },
+  timeline: {
+    title: "Timeline",
+    loading: "Lining up the releases…",
+    note: "Albums and EPs year by year. Dates come from Wikidata when it lists the release, otherwise from Deezer, which sometimes gives a reissue date.",
+    events: {
+      formed: "Formed",
+      born: "Born",
+      activeFrom: "Career begins",
+      dissolved: "Disbanded",
+      died: "Died",
+    },
   },
   history: {
     title: "History",
@@ -343,6 +371,34 @@ const pt: Dictionary = {
       return `Do álbum ${album} (${year}), ${words[n] ?? n} ano${n > 1 ? "s" : ""} ${diff > 0 ? "depois de" : "antes de"} “${title}”.`;
     },
     label: (label) => `Também lançada pela ${label}.`,
+    filterLabel: "Filtrar recomendações",
+    filters: {
+      all: "Todas",
+      sameEra: "Mesma época",
+      lesserKnown: "Menos conhecidas",
+      otherGenre: "Outro gênero",
+    },
+    filterHelp: {
+      sameEra: "Lançadas até cinco anos antes ou depois desta música.",
+      lesserKnown: "De artistas com menos fãs no Deezer do que a maioria dos outros sugeridos aqui.",
+      otherGenre: "De um gênero diferente do desta música, para mudar de ares.",
+    },
+  },
+  trail: {
+    label: "Seu caminho",
+    earlier: (n) => `+${n} antes`,
+  },
+  timeline: {
+    title: "Linha do tempo",
+    loading: "Organizando os lançamentos…",
+    note: "Álbuns e EPs ano a ano. As datas vêm do Wikidata quando ele registra o lançamento; senão, do Deezer, que às vezes traz a data de uma reedição.",
+    events: {
+      formed: "Formação",
+      born: "Nascimento",
+      activeFrom: "Início da carreira",
+      dissolved: "Separação",
+      died: "Falecimento",
+    },
   },
   history: {
     title: "Histórico",
@@ -522,6 +578,34 @@ const es: Dictionary = {
       return `Del álbum ${album} (${year}), ${words[n] ?? n} año${n > 1 ? "s" : ""} ${diff > 0 ? "después de" : "antes de"} “${title}”.`;
     },
     label: (label) => `También publicada por ${label}.`,
+    filterLabel: "Filtrar recomendaciones",
+    filters: {
+      all: "Todas",
+      sameEra: "Misma época",
+      lesserKnown: "Menos conocidas",
+      otherGenre: "Otro género",
+    },
+    filterHelp: {
+      sameEra: "Publicadas hasta cinco años antes o después de esta canción.",
+      lesserKnown: "De artistas con menos fans en Deezer que la mayoría de los demás sugeridos aquí.",
+      otherGenre: "De un género distinto al de esta canción, para cambiar de aires.",
+    },
+  },
+  trail: {
+    label: "Tu camino",
+    earlier: (n) => `+${n} antes`,
+  },
+  timeline: {
+    title: "Línea de tiempo",
+    loading: "Ordenando los lanzamientos…",
+    note: "Álbumes y EP año a año. Las fechas vienen de Wikidata cuando registra el lanzamiento; si no, de Deezer, que a veces da la fecha de una reedición.",
+    events: {
+      formed: "Formación",
+      born: "Nacimiento",
+      activeFrom: "Inicio de su carrera",
+      dissolved: "Separación",
+      died: "Fallecimiento",
+    },
   },
   history: {
     title: "Historial",

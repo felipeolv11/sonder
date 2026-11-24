@@ -2,7 +2,7 @@ import { cacheLife } from "next/cache";
 import * as dz from "./deezer";
 import { mapLimit } from "./http";
 import { translateHeading } from "./headings";
-import { baseTitle, capitalize, norm, sameTitle, yearOf } from "./text";
+import { baseTitle, capitalize, editionless, norm, sameTitle, yearOf } from "./text";
 import {
   articleUrl,
   findAlbumArticle,
@@ -10,10 +10,13 @@ import {
   findSongArticle,
   getSections,
   getSitelinks,
+  getArtistEvents,
+  getReleaseDates,
   getWikidataFacts,
   translateTexts,
   publishedYear,
   type WikiArticle,
+  type WdDate,
   type WikiLang,
   type WikidataFacts,
 } from "./wiki";
@@ -95,10 +98,14 @@ export type ReasonPart =
   | { t: "era"; album: string; year: number; diff: number; title: string }
   | { t: "label"; label: string };
 
+/** Filters the reader can apply to recommendations, each derived from data the ranking already uses. */
+export type RecFilter = "sameEra" | "lesserKnown" | "otherGenre";
+
 export type Recommendation = SongCard & {
   year?: number;
   reasons: ReasonPart[];
   signals: string[];
+  filters: RecFilter[];
 };
 
 /** One Wikipedia article, cut down to its quotable parts, for the artist and album pages. */
@@ -606,7 +613,7 @@ export async function getRecommendations(id: number, lang: Lang = "en"): Promise
   const song = await getSong(id, lang);
   if (!song) return [];
 
-  const related = (await dz.getRelatedArtists(song.artist.id, 20)).filter((a) => a.id !== song.artist.id).slice(0, 14);
+  const related = (await dz.getRelatedArtists(song.artist.id, 20)).filter((a) => a.id !== song.artist.id).slice(0, 18);
   if (!related.length) return [];
 
   const tops = await mapLimit(related, 4, (a) => safe(dz.getTopTracks(a.id, 6)));
@@ -616,7 +623,8 @@ export async function getRecommendations(id: number, lang: Lang = "en"): Promise
     if (track) candidates.push({ artist, relatedRank: i, track });
   });
 
-  const detailed = await mapLimit(candidates.slice(0, 11), 3, async (c) => {
+  // A pool larger than the ten shown, so each filter still has songs to offer.
+  const detailed = await mapLimit(candidates.slice(0, 16), 3, async (c) => {
     const original = await originalRelease(c, lang);
     const detail = await safe(dz.getTrack(original.track.id));
     return { ...c, ...original, detail };
@@ -624,6 +632,9 @@ export async function getRecommendations(id: number, lang: Lang = "en"): Promise
 
   const seedGenres = new Set(song.seed.genres.map(norm));
   const seedName = song.artist.name;
+  // "Lesser known" means fewer Deezer fans than most of the other candidates.
+  const fanCounts = detailed.map((c) => c.artist.nb_fan).filter((n): n is number => typeof n === "number").sort((a, b) => a - b);
+  const medianFans = fanCounts.length ? fanCounts[Math.floor(fanCounts.length / 2)] : undefined;
 
   const scored = detailed.map((c) => {
     const genres = (c.album?.genres?.data ?? []).map((g) => g.name);
@@ -655,6 +666,11 @@ export async function getRecommendations(id: number, lang: Lang = "en"): Promise
       ...(bpm ? [`${Math.round(bpm)} BPM`] : []),
     ];
 
+    const filters: RecFilter[] = [];
+    if (year && song.seed.year && Math.abs(year - song.seed.year) <= 5) filters.push("sameEra");
+    if (medianFans !== undefined && c.artist.nb_fan !== undefined && c.artist.nb_fan < medianFans) filters.push("lesserKnown");
+    if (genres.length && !sharedGenres.length) filters.push("otherGenre");
+
     const card = toCard(c.track);
     return {
       score,
@@ -666,14 +682,12 @@ export async function getRecommendations(id: number, lang: Lang = "en"): Promise
         year,
         reasons: parts.slice(0, 3),
         signals,
+        filters,
       } satisfies Recommendation,
     };
   });
 
-  return scored
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 10)
-    .map((s) => s.rec);
+  return scored.sort((a, b) => b.score - a.score).map((s) => s.rec);
 }
 
 /* ---------- Artist ---------- */
@@ -701,15 +715,16 @@ function toRow(t: dz.DzTrack, album?: dz.DzAlbumRef): TrackRow {
   };
 }
 
-/** Drops repeats of the same release title (reissues listed next to the original keep the first). */
+/** Drops reissues of the same release ("Remastered", "Deluxe Edition"), keeping the earliest. */
 function uniqueReleases(list: ReleaseCard[]) {
-  const seen = new Set<string>();
-  return list.filter((r) => {
-    const key = norm(baseTitle(r.title));
-    if (seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  const best = new Map<string, ReleaseCard>();
+  for (const r of list) {
+    const key = norm(editionless(r.title));
+    const prev = best.get(key);
+    if (!prev || (r.year ?? 9999) < (prev.year ?? 9999)) best.set(key, r);
+  }
+  const keep = new Set(best.values());
+  return list.filter((r) => keep.has(r));
 }
 
 export async function getArtist(id: number): Promise<Artist | null> {
@@ -807,6 +822,83 @@ export async function getArtistBio(id: number, lang: Lang = "en"): Promise<Artic
   if (await tr.run()) cacheLife("days");
   else cacheLife("minutes");
   return block;
+}
+
+/* ---------- Artist timeline ---------- */
+
+export type TimelineEntry =
+  | { t: "event"; kind: "formed" | "born" | "activeFrom" | "dissolved" | "died"; year: number; date: WdDate }
+  | { t: "release"; year: number; release: ReleaseCard; source: "Wikidata" | "Deezer" };
+
+/**
+ * The artist's releases year by year, with formation, birth, break-up and death from Wikidata.
+ * Releases follow the Deezer discography (Wikidata's lists mix in demos, singles and box sets),
+ * but their dates come from Wikidata when it knows the release, since Deezer often has a reissue date.
+ */
+export async function getArtistTimeline(id: number, lang: Lang = "en"): Promise<TimelineEntry[]> {
+  "use cache";
+
+  const artist = await getArtist(id);
+  if (!artist) {
+    cacheLife("days");
+    return [];
+  }
+
+  let degraded = false;
+  const enrich = <T,>(p: Promise<T>) =>
+    p.catch((err) => {
+      console.error("[sonder] timeline enrichment failed for artist", id, err);
+      degraded = true;
+      return null;
+    });
+  const article = await enrich(findArtistArticle(artist.name));
+  const qid = article?.wikidataId;
+  const [events, wdReleases] = qid
+    ? await Promise.all([enrich(getArtistEvents(qid)), enrich(getReleaseDates(qid, lang))])
+    : [null, null];
+
+  const firstYear = new Map<string, number>();
+  for (const r of wdReleases ?? []) {
+    const y = yearOf(r.date);
+    for (const name of [r.englishTitle, r.title]) {
+      if (!name || !y) continue;
+      const key = norm(editionless(name));
+      if (!firstYear.has(key) || y < firstYear.get(key)!) firstYear.set(key, y);
+    }
+  }
+
+  // After an artist's death, Deezer's "albums" are mostly compilations and reissues with new dates:
+  // from then on, only releases Wikidata documents make the timeline.
+  const deathYear = yearOf(events?.died?.iso);
+  const entries: TimelineEntry[] = [];
+  for (const release of [...artist.albums, ...artist.singles.filter((s) => s.recordType === "ep")]) {
+    const wdYear = firstYear.get(norm(editionless(release.title)));
+    const year = wdYear ?? release.year;
+    if (!year) continue;
+    if (deathYear && !wdYear && year > deathYear) continue;
+    entries.push({ t: "release", year, release: { ...release, year }, source: wdYear ? "Wikidata" : "Deezer" });
+  }
+
+  const lastRelease = Math.max(0, ...entries.map((e) => e.year));
+  const event = (kind: Extract<TimelineEntry, { t: "event" }>["kind"], date?: WdDate) => {
+    const year = yearOf(date?.iso);
+    if (date && year) entries.push({ t: "event", kind, year, date });
+  };
+  if (events?.formed) event("formed", events.formed);
+  else if (events?.born) event("born", events.born);
+  if (events?.activeFrom && !events.formed) event("activeFrom", events.activeFrom);
+  // A band that "dissolved" and kept releasing albums afterwards has reunited: leave the break-up out.
+  if (events?.dissolved && (yearOf(events.dissolved.iso) ?? 0) >= lastRelease) event("dissolved", events.dissolved);
+  if (events?.died) event("died", events.died);
+
+  // Chronological; within a year, beginnings first, endings last.
+  const order = (e: TimelineEntry) =>
+    e.t === "release" ? 1 : e.kind === "dissolved" || e.kind === "died" ? 2 : 0;
+  entries.sort((a, b) => a.year - b.year || order(a) - order(b));
+
+  if (degraded) cacheLife("minutes");
+  else cacheLife("days");
+  return entries;
 }
 
 /* ---------- Album ---------- */

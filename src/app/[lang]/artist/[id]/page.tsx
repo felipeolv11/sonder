@@ -5,6 +5,7 @@ import { Ambient } from "@/components/Ambient";
 import { ArtistBio } from "@/components/ArticleView";
 import { ArtistGrid, ReleaseGrid, TrackList } from "@/components/Catalog";
 import { HeroSkeleton, StorySkeleton } from "@/components/Skeletons";
+import { ArtistTimeline } from "@/components/Timeline";
 import { hasLocale, localeTags, locales, type Locale } from "@/i18n/config";
 import { getDictionary } from "@/i18n/dictionaries";
 import { getLocale } from "@/i18n/server";
@@ -34,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 export default async function ArtistPage({ params }: Props) {
   const locale = await getLocale();
   return (
-    <div className="page song-page">
+    <div className="page song-page" data-trail>
       <Suspense
         fallback={
           <>
@@ -56,7 +57,6 @@ async function ArtistView({ params, locale }: { params: Props["params"]; locale:
   if (!artist) notFound();
   const t = getDictionary(locale);
   const compact = new Intl.NumberFormat(localeTags[locale], { notation: "compact", maximumFractionDigits: 1 });
-  const years = artist.albums.map((a) => a.year).filter((y): y is number => !!y);
 
   return (
     <>
@@ -85,12 +85,6 @@ async function ArtistView({ params, locale }: { params: Props["params"]; locale:
               <div>
                 <dt>{t.artist.releases}</dt>
                 <dd>{artist.albums.length}</dd>
-              </div>
-            )}
-            {years.length > 0 && (
-              <div>
-                <dt>{t.song.year}</dt>
-                <dd>{Math.min(...years) === Math.max(...years) ? years[0] : `${Math.min(...years)}–${Math.max(...years)}`}</dd>
               </div>
             )}
           </dl>
@@ -127,6 +121,10 @@ async function ArtistView({ params, locale }: { params: Props["params"]; locale:
           </div>
         </aside>
       </div>
+
+      <Suspense fallback={<p className="loading-note timeline-loading">{t.timeline.loading}</p>}>
+        <ArtistTimeline id={artist.id} locale={locale} />
+      </Suspense>
 
       {artist.albums.length > 0 && (
         <section className="shelf" aria-labelledby="albums-title">

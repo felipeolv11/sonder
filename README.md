@@ -41,11 +41,22 @@ As seções de interpretação e de opinião também ficam marcadas com um filet
 4. Ordena pela proximidade que o Deezer dá ao artista e, depois, por gênero em comum, proximidade do ano de lançamento e andamento.
 5. Escreve o motivo de cada recomendação só a partir desses dados (por exemplo, "Do álbum *Grace* (1994), três anos antes de 'No Surprises'"). Nada é inventado.
 
+São calculadas até 16 recomendações e as dez primeiras aparecem. Os filtros usam o grupo todo, com os mesmos dados da ordenação:
+
+- **Mesma época**: lançadas até cinco anos antes ou depois da música.
+- **Menos conhecidas**: de artistas com menos fãs no Deezer do que a mediana do grupo.
+- **Outro gênero**: com um gênero diferente do da música.
+
 ### Páginas de artista e de álbum
 
-- **Artista** (`/artist/[id]`): biografia da Wikipedia, as dez músicas mais tocadas no Deezer, álbuns, singles e EPs (sem coletâneas, e sem repetir o mesmo título), e os artistas que o Deezer relaciona a ele.
+- **Artista** (`/artist/[id]`): biografia da Wikipedia, as dez músicas mais tocadas no Deezer, uma linha do tempo, álbuns, singles e EPs (sem coletâneas e sem reedições repetidas), e os artistas que o Deezer relaciona a ele.
+- **Linha do tempo**: os álbuns e EPs da discografia do Deezer, ano a ano, com a formação, o nascimento, a separação e a morte registrados no Wikidata. A data de cada lançamento vem do Wikidata (pelo Wikidata Query Service) quando ele registra o disco, porque o Deezer às vezes traz a data de uma reedição. Depois da morte do artista, só entram lançamentos registrados no Wikidata, já que o resto costuma ser coletânea.
 - **Álbum** (`/album/[id]`): faixas, a história do álbum na Wikipedia e a ficha técnica. A data de lançamento vem do Wikidata quando existe, porque a do Deezer costuma ser a de uma reedição. Para singles sem artigo próprio, usa o artigo da música.
 - A página da música leva ao artista e ao álbum, e a busca mostra o artista e os álbuns quando o termo buscado traz o nome do artista.
+
+### Caminho de descoberta
+
+A página da música mostra o caminho até ela ("Creep › 1979 › Bullet With Butterfly Wings"). Cada link seguido dentro das páginas de música, artista e álbum acrescenta um passo; uma música aberta pela busca, pela página inicial ou pelo histórico começa um caminho novo; voltar para uma música do caminho o corta ali. O caminho fica no sessionStorage, então cada aba tem o seu (`src/components/trail.tsx`).
 
 ## Idiomas
 

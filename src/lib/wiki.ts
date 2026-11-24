@@ -313,6 +313,90 @@ export function publishedYear(f?: WikidataFacts | null) {
   return yearOf(f?.published?.iso);
 }
 
+/* ---------- Artist timeline (Wikidata) ---------- */
+
+export type WdDate = { iso: string; precision: number };
+
+export type ArtistEvents = {
+  formed?: WdDate;
+  born?: WdDate;
+  activeFrom?: WdDate;
+  dissolved?: WdDate;
+  died?: WdDate;
+};
+
+function dates(claims: WdClaim[] | undefined): WdDate[] {
+  return (claims ?? [])
+    .filter((c) => c.rank !== "deprecated")
+    .map((c) => c.mainsnak.datavalue?.value as { time?: string; precision?: number } | undefined)
+    .filter((v): v is { time: string; precision?: number } => !!v?.time && !v.time.startsWith("-"))
+    .map((v) => ({ iso: v.time.replace(/^\+/, ""), precision: v.precision ?? 9 }))
+    .sort((a, b) => a.iso.localeCompare(b.iso));
+}
+
+/** Formation, birth, start of career, break-up and death of an artist, as Wikidata records them. */
+export async function getArtistEvents(qid: string): Promise<ArtistEvents> {
+  "use cache";
+  cacheLife("days");
+  const res = await wd({ action: "wbgetentities", ids: qid, props: "claims" });
+  const claims = res.entities?.[qid]?.claims ?? {};
+  return {
+    formed: dates(claims.P571)[0],
+    born: dates(claims.P569)[0],
+    activeFrom: dates(claims.P2031)[0],
+    dissolved: dates(claims.P576).at(-1),
+    died: dates(claims.P570).at(-1),
+  };
+}
+
+export type WdRelease = { qid: string; title: string; englishTitle?: string; date: string; kind: "album" | "ep" | "live" };
+
+// Studio album, EP, live album, then plain "album" (used when an item isn't more specific).
+const RELEASE_TYPES: Record<string, WdRelease["kind"]> = { Q208569: "album", Q169930: "ep", Q209939: "live", Q482994: "album" };
+const TYPE_PRIORITY = ["Q208569", "Q169930", "Q209939", "Q482994"];
+
+type SparqlValue = { value: string };
+type SparqlResult = { results?: { bindings?: Record<string, SparqlValue | undefined>[] } };
+
+/**
+ * The artist's albums, EPs and live albums with their first publication date, from the Wikidata
+ * Query Service. Titles are in `lang` when Wikidata has them, with the English title for matching.
+ */
+export async function getReleaseDates(qid: string, lang: WikiLang = "en"): Promise<WdRelease[]> {
+  "use cache";
+  cacheLife("days");
+  if (!/^Q\d+$/.test(qid)) return [];
+
+  const query = `
+    SELECT ?item ?type (MIN(?d) AS ?date) (SAMPLE(?en) AS ?enLabel) (SAMPLE(?loc) AS ?localLabel) WHERE {
+      ?item wdt:P175 wd:${qid}; wdt:P31 ?type; wdt:P577 ?d.
+      VALUES ?type { ${Object.keys(RELEASE_TYPES).map((q) => `wd:${q}`).join(" ")} }
+      OPTIONAL { ?item rdfs:label ?en FILTER(LANG(?en) = "en") }
+      OPTIONAL { ?item rdfs:label ?loc FILTER(LANG(?loc) = "${lang}") }
+    } GROUP BY ?item ?type LIMIT 300`;
+  const url = new URL("https://query.wikidata.org/sparql");
+  url.searchParams.set("query", query);
+  url.searchParams.set("format", "json");
+  const res = (await getJson<SparqlResult>(url.toString(), "Wikidata Query Service")) ?? {};
+
+  // An item can carry several types ("album" and "studio album"): keep the most specific.
+  const byItem = new Map<string, WdRelease & { priority: number }>();
+  for (const b of res.results?.bindings ?? []) {
+    const item = b.item?.value.split("/").pop();
+    const type = b.type?.value.split("/").pop();
+    const date = b.date?.value;
+    const title = b.localLabel?.value ?? b.enLabel?.value;
+    if (!item || !type || !date || !title || date.startsWith("-")) continue;
+    const priority = TYPE_PRIORITY.indexOf(type);
+    const prev = byItem.get(item);
+    if (prev && prev.priority <= priority) continue;
+    byItem.set(item, { qid: item, title, englishTitle: b.enLabel?.value, date: date.slice(0, 10), kind: RELEASE_TYPES[type], priority });
+  }
+  return [...byItem.values()]
+    .map((r) => ({ qid: r.qid, title: r.title, englishTitle: r.englishTitle, date: r.date, kind: r.kind }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+}
+
 /* ---------- Machine translation (MinT) ---------- */
 
 /*
