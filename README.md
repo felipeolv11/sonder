@@ -52,7 +52,7 @@ São calculadas até 16 recomendações e as dez primeiras aparecem. Os filtros 
 - **Artista** (`/artist/[id]`): biografia da Wikipedia, as dez músicas mais tocadas no Deezer, uma linha do tempo, álbuns, singles e EPs (sem coletâneas e sem reedições repetidas), e os artistas que o Deezer relaciona a ele.
 - **Linha do tempo**: os álbuns e EPs da discografia do Deezer, ano a ano, com a formação, o nascimento, a separação e a morte registrados no Wikidata. A data de cada lançamento vem do Wikidata (pelo Wikidata Query Service) quando ele registra o disco, porque o Deezer às vezes traz a data de uma reedição. Depois da morte do artista, só entram lançamentos registrados no Wikidata, já que o resto costuma ser coletânea.
 - **Álbum** (`/album/[id]`): faixas, a história do álbum na Wikipedia e a ficha técnica. A data de lançamento vem do Wikidata quando existe, porque a do Deezer costuma ser a de uma reedição. Para singles sem artigo próprio, usa o artigo da música.
-- A página da música leva ao artista e ao álbum, e a busca mostra o artista e os álbuns quando o termo buscado traz o nome do artista.
+- Essas páginas são abertas a partir da página da música, pelo nome do artista e pelo nome do álbum. A busca continua só de músicas.
 
 ### Caminho de descoberta
 

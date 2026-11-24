@@ -28,8 +28,8 @@ const en = {
     language: "Language",
   },
   search: {
-    placeholder: "Search a song, artist or album...",
-    label: "Search a song, artist or album",
+    placeholder: "Search for a song...",
+    label: "Search for a song",
     suggestions: "Suggested songs",
     noMatch: (q: string) => `No songs match “${q}”. Try the artist’s name with the title.`,
     seeAll: (q: string) => `See all results for “${q}”`,
@@ -43,7 +43,7 @@ const en = {
   },
   results: {
     emptyTitle: "Search for a song",
-    emptyBody: "Type a song, artist or album in the search field above. Adding the artist’s name helps find the original recording.",
+    emptyBody: "Type the name of a song in the search field above. Adding the artist’s name helps find the original recording.",
     errorTitle: "Search couldn’t reach the music catalogue",
     errorBody: "The connection to Deezer failed. Check your internet connection, then search again.",
     noneTitle: (q: string) => `No songs match “${q}”`,
@@ -51,10 +51,6 @@ const en = {
     title: (q: string) => `Songs matching “${q}”`,
     sub: "Choose a recording to open its story.",
     cover: (album: string) => `${album} cover`,
-    artist: "Artist",
-    artistOpen: "See the artist’s story, songs and albums",
-    songs: "Songs",
-    albums: "Albums",
   },
   song: {
     album: "Album",
@@ -237,8 +233,8 @@ const pt: Dictionary = {
     language: "Idioma",
   },
   search: {
-    placeholder: "Busque uma música, artista ou álbum...",
-    label: "Busque uma música, artista ou álbum",
+    placeholder: "Busque uma música...",
+    label: "Busque uma música",
     suggestions: "Músicas sugeridas",
     noMatch: (q) => `Nenhuma música encontrada para “${q}”. Tente o nome do artista junto com o título.`,
     seeAll: (q) => `Ver todos os resultados para “${q}”`,
@@ -252,7 +248,7 @@ const pt: Dictionary = {
   },
   results: {
     emptyTitle: "Busque uma música",
-    emptyBody: "Digite uma música, artista ou álbum no campo de busca acima. Incluir o nome do artista ajuda a achar a gravação original.",
+    emptyBody: "Digite o nome de uma música no campo de busca acima. Incluir o nome do artista ajuda a achar a gravação original.",
     errorTitle: "A busca não conseguiu acessar o catálogo",
     errorBody: "A conexão com o Deezer falhou. Verifique sua internet e busque de novo.",
     noneTitle: (q) => `Nenhuma música encontrada para “${q}”`,
@@ -260,10 +256,6 @@ const pt: Dictionary = {
     title: (q) => `Músicas para “${q}”`,
     sub: "Escolha uma gravação para abrir a história dela.",
     cover: (album) => `Capa de ${album}`,
-    artist: "Artista",
-    artistOpen: "Veja a história, as músicas e os álbuns do artista",
-    songs: "Músicas",
-    albums: "Álbuns",
   },
   song: {
     album: "Álbum",
@@ -444,8 +436,8 @@ const es: Dictionary = {
     language: "Idioma",
   },
   search: {
-    placeholder: "Busca una canción, artista o álbum...",
-    label: "Busca una canción, artista o álbum",
+    placeholder: "Busca una canción...",
+    label: "Busca una canción",
     suggestions: "Canciones sugeridas",
     noMatch: (q) => `Ninguna canción coincide con “${q}”. Prueba con el nombre del artista y el título.`,
     seeAll: (q) => `Ver todos los resultados de “${q}”`,
@@ -459,7 +451,7 @@ const es: Dictionary = {
   },
   results: {
     emptyTitle: "Busca una canción",
-    emptyBody: "Escribe una canción, artista o álbum en el buscador de arriba. Añadir el nombre del artista ayuda a encontrar la grabación original.",
+    emptyBody: "Escribe el nombre de una canción en el buscador de arriba. Añadir el nombre del artista ayuda a encontrar la grabación original.",
     errorTitle: "La búsqueda no pudo acceder al catálogo",
     errorBody: "La conexión con Deezer falló. Revisa tu conexión a internet y vuelve a buscar.",
     noneTitle: (q) => `Ninguna canción coincide con “${q}”`,
@@ -467,10 +459,6 @@ const es: Dictionary = {
     title: (q) => `Canciones para “${q}”`,
     sub: "Elige una grabación para abrir su historia.",
     cover: (album) => `Portada de ${album}`,
-    artist: "Artista",
-    artistOpen: "Mira la historia, las canciones y los álbumes del artista",
-    songs: "Canciones",
-    albums: "Álbumes",
   },
   song: {
     album: "Álbum",

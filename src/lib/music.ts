@@ -984,30 +984,6 @@ export async function getAlbumStory(id: number, lang: Lang = "en"): Promise<Arti
   return block;
 }
 
-/* ---------- Catalogue search (artists and albums) ---------- */
-
-/** The artist a query names, and albums matching it, to show above the song results. */
-export async function searchCatalog(query: string): Promise<{ artist: ArtistCard | null; albums: ReleaseCard[] }> {
-  "use cache";
-  cacheLife("hours");
-
-  const q = query.trim();
-  if (!q) return { artist: null, albums: [] };
-  const qn = ` ${norm(q)} `;
-  const [artists, albums] = await Promise.all([safe(dz.searchArtists(q, 5)), safe(dz.searchAlbums(q, 20))]);
-
-  // Only an artist whose whole name is in the query: "radiohead creep" -> Radiohead.
-  const named = (artists ?? []).find((a) => norm(a.name).length > 1 && qn.includes(` ${norm(a.name)} `));
-  const artist = named ? { id: named.id, name: named.name, picture: named.picture_big || named.picture_xl || "" } : null;
-
-  const matching = (albums ?? [])
-    .filter((a) => a.record_type !== "compile" && !TRIBUTE.test(`${a.title} ${a.artist?.name ?? ""}`))
-    .filter((a) => (artist ? a.artist?.id === artist.id : true))
-    .map((a) => toRelease(a, a.artist?.name ?? ""));
-
-  return { artist, albums: uniqueReleases(matching).slice(0, 6) };
-}
-
 /* ---------- Ambience ---------- */
 
 export async function getAmbientCovers(): Promise<string[]> {

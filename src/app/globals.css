@@ -1636,55 +1636,6 @@ a.trail-step:hover {
   color: var(--label-3);
 }
 
-/* Search: artist and albums alongside the songs */
-
-.artist-result {
-  display: inline-flex;
-  align-items: center;
-  gap: 16px;
-  max-width: 100%;
-  padding: 12px 22px 12px 12px;
-  margin-bottom: 44px;
-  border-radius: 999px;
-  transition: background-color 0.15s;
-}
-.artist-result:hover {
-  background: var(--glass-strong);
-}
-.artist-result img {
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  object-fit: cover;
-  flex: none;
-  background: var(--fill);
-}
-.artist-result > span {
-  display: grid;
-  min-width: 0;
-}
-.artist-result-kind {
-  font-size: 12px;
-  color: var(--label-3);
-}
-.artist-result-name {
-  font-size: 19px;
-  font-weight: 600;
-  letter-spacing: -0.012em;
-}
-.artist-result-cta {
-  font-size: 13px;
-  color: var(--label-2);
-}
-.results-group + .results-group {
-  margin-top: 64px;
-}
-.results-title {
-  font-size: 15px;
-  font-weight: 600;
-  margin-bottom: 18px;
-}
-
 /* Loading */
 
 .skeleton {
@@ -1811,9 +1762,6 @@ a.trail-step:hover {
   }
   .trail-artist {
     display: none;
-  }
-  .artist-result {
-    border-radius: var(--r-panel);
   }
   .recent-row {
     grid-template-columns: minmax(0, 1fr);
