@@ -29,9 +29,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const id = parseId(rawId);
   const song = id ? await getSong(id, lang).catch(() => null) : null;
   if (!song) return { title: t.song };
+  const title = t.songTitle(song.title, song.artist.name);
+  const description = t.songDescription(song.title, song.artist.name);
   return {
-    title: t.songTitle(song.title, song.artist.name),
-    description: t.songDescription(song.title, song.artist.name),
+    title,
+    description,
+    openGraph: { title, description, siteName: "Sonder", type: "music.song" },
+    twitter: { card: "summary_large_image", title, description },
     alternates: { languages: Object.fromEntries(locales.map((l) => [localeTags[l], `/${l}/song/${song.id}`])) },
   };
 }

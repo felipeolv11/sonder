@@ -66,6 +66,10 @@ Na página de cada música dá para **favoritar** e **adicionar a uma lista** (c
 
 A página `/about`, linkada no rodapé, explica de onde vêm as informações, como as histórias separam fatos de interpretação, como as recomendações são escolhidas e o que fica guardado no navegador. O texto dela fica em `src/i18n/about.ts`.
 
+### Imagens de compartilhamento
+
+Links de músicas, álbuns e artistas mostram uma prévia própria no WhatsApp, LinkedIn e afins: a capa (ou a foto do artista), o título e o começo da história. As imagens são geradas pelos arquivos `opengraph-image.tsx` de cada rota, com as mesmas fontes do site (baixadas em TTF do Google Fonts, porque o gerador não aceita WOFF2), e convertidas para JPEG com o sharp: em PNG, a capa deixava cada imagem com 600 a 800 KB, acima do que o WhatsApp aceita. A história só entra se carregar em até 3,5 segundos; senão, a prévia usa a descrição da página. As outras páginas usam uma imagem padrão com o texto da página inicial e capas das paradas.
+
 ## Idiomas
 
 A interface está em inglês, português (Brasil) e espanhol, em `/en`, `/pt` e `/es`.

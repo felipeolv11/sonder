@@ -25,9 +25,12 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const id = parseId(rawId);
   const artist = id ? await getArtist(id).catch(() => null) : null;
   if (!artist) return { title: t.artist };
+  const description = t.artistDescription(artist.name);
   return {
     title: artist.name,
-    description: t.artistDescription(artist.name),
+    description,
+    openGraph: { title: artist.name, description, siteName: "Sonder", type: "profile" },
+    twitter: { card: "summary_large_image", title: artist.name, description },
     alternates: { languages: Object.fromEntries(locales.map((l) => [localeTags[l], `/${l}/artist/${artist.id}`])) },
   };
 }

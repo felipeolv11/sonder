@@ -32,6 +32,9 @@ export async function generateMetadata({ params }: LayoutProps<"/[lang]">): Prom
     title: { default: "Sonder", template: "%s · Sonder" },
     description: getDictionary(lang).meta.description,
     alternates: { languages: Object.fromEntries(locales.map((l) => [localeTags[l], `/${l}`])) },
+    // Large previews when links are shared; the image comes from opengraph-image.tsx.
+    openGraph: { siteName: "Sonder", type: "website", locale: localeTags[lang].replace("-", "_") },
+    twitter: { card: "summary_large_image" },
   };
 }
 
