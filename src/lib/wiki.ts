@@ -46,7 +46,7 @@ export type WikiLang = "en" | "pt" | "es";
 const wpApi = (lang: WikiLang) => `https://${lang}.wikipedia.org/w/api.php`;
 const WD = "https://www.wikidata.org/w/api.php";
 
-type WpPage = {
+export type WpPage = {
   pageid?: number;
   title: string;
   missing?: string;
@@ -114,8 +114,8 @@ const KIND_WORDS: Record<Kind, RegExp> = {
   artist: /\b(band|singer|musician|rapper|group|duo|trio|songwriter|composer|producer|dj|artist|vocalist|guitarist|pianist|orchestra|ensemble|collective|act)\b/i,
 };
 
-/** Does this page plausibly describe `name` (a song/album) by `artist`? */
-function matches(p: WpPage, kind: Kind, name: string, artist: string): boolean {
+/** Does this page plausibly describe `name` (a song/album) by `artist`? Exported for tests. */
+export function matches(p: WpPage, kind: Kind, name: string, artist: string): boolean {
   if (p.missing !== undefined || p.pageprops?.disambiguation !== undefined) return false;
   const titleCore = p.title.replace(/\s*\([^)]*\)\s*$/, "");
   const paren = /\(([^)]*)\)\s*$/.exec(p.title)?.[1] ?? "";
