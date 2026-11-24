@@ -1,5 +1,7 @@
 # Sonder
 
+[![CI](https://github.com/felipeolv11/sonder/actions/workflows/ci.yml/badge.svg)](https://github.com/felipeolv11/sonder/actions/workflows/ci.yml)
+
 Um app de descoberta musical. Busque uma música para ver a capa, a história documentada por trás dela e do álbum, e dez músicas que você talvez goste em seguida. Cada artista e cada álbum também têm uma página própria, com biografia, discografia, faixas e créditos. Não há reprodução de áudio.
 
 **No ar:** https://sonder-zeta-khaki.vercel.app
@@ -10,6 +12,7 @@ Um app de descoberta musical. Busque uma música para ver a capa, a história do
 npm install
 cp .env.example .env.local   # depois preencha WIKIMEDIA_CONTACT
 npm run dev                  # http://localhost:3000
+npm test                     # testes
 ```
 
 `WIKIMEDIA_CONTACT` deve ser um e-mail ou uma URL sobre o app. A Wikimedia permite cerca de 10 requisições por minuto a clientes que não se identificam, e 200 por minuto aos que se identificam ([limites de uso](https://www.mediawiki.org/wiki/Wikimedia_APIs/Rate_limits)). Sem essa variável, as histórias ainda carregam, mas devagar.
@@ -69,6 +72,17 @@ A página `/about`, linkada no rodapé, explica de onde vêm as informações, c
 ### Imagens de compartilhamento
 
 Links de músicas, álbuns e artistas mostram uma prévia própria no WhatsApp, LinkedIn e afins: a capa (ou a foto do artista), o título e o começo da história. As imagens são geradas pelos arquivos `opengraph-image.tsx` de cada rota, com as mesmas fontes do site (baixadas em TTF do Google Fonts, porque o gerador não aceita WOFF2), e convertidas para JPEG com o sharp: em PNG, a capa deixava cada imagem com 600 a 800 KB, acima do que o WhatsApp aceita. A história só entra se carregar em até 3,5 segundos; senão, a prévia usa a descrição da página. As outras páginas usam uma imagem padrão com o texto da página inicial e capas das paradas.
+
+## Testes e CI
+
+Os testes (`tests/`, com Vitest) cobrem as regras do próprio Sonder, sem acessar a internet: Deezer e Wikipedia são simulados.
+
+- **Recomendações**: um artista por música, nunca o da música buscada; versões ao vivo e músicas com o mesmo título ficam de fora; coletâneas são trocadas pelo álbum original; os motivos e os filtros saem só dos dados disponíveis.
+- **Busca**: a gravação original do artista citado vem primeiro, tributos e versões repetidas saem.
+- **Wikipedia**: quando uma página é aceita como o artigo da música (título, tipo e artista) e a ordem das tentativas de título.
+- **Textos**: normalização de títulos, glossário de seções e as frases das recomendações, datas e créditos nos três idiomas.
+
+A cada push e pull request, o GitHub Actions (`.github/workflows/ci.yml`) roda lint, verificação de tipos, testes e build.
 
 ## Idiomas
 
